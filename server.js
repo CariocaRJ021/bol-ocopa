@@ -8,16 +8,12 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'copa2026-key', resave: false, saveUninitialized: true }));
 
-// 1. BANCO DE DADOS EM MEMÓRIA
+// 1. BANCO DE DADOS EM MEMÓRIA (Seus amigos vão se auto-cadastrar aqui dentro agora!)
 const USUARIOS_CADASTRADOS = { "admin": "1234", "thiago": "1234", "sofia": "1234" };
 const disputasBase = [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }];
 const pClassif = {}; 
 const pPlacar = {};
-
-// Resultados Reais inseridos pelo Admin (para cálculo de pontos do ranking)
-const RESULTADOS_REAIS = {
-    // Exemplo: "1": { golA: 2, golB: 1 } -> Preenchido conforme os jogos acontecem
-};
+const RESULTADOS_REAIS = {};
 
 // 2. MAPA DE BANDEIRAS (48 SELEÇÕES DA COPA 2026)
 const PAISES = {
@@ -27,11 +23,11 @@ const PAISES = {
     "Senegal": "sn", "Tunísia": "tn", "Argélia": "dz", "Uruguai": "uy", "Colômbia": "co", "Equador": "ec",
     "Peru": "pe", "Chile": "cl", "Paraguai": "py", "Venezuela": "ve", "Jamaica": "jm", "Costa Rica": "cr",
     "Panamá": "pa", "Honduras": "hn", "Gana": "gh", "Camarões": "cm", "Nigéria": "ng", "Egito": "eg",
-    "Irã": "ir", "Arábia Saudita": "sa", "Catar", "qa", "Iraque": "iq", "Uzbequistão": "uz", "Ucrânia": "ua",
+    "Irã": "ir", "Arábia Saudita": "sa", "Catar": "qa", "Iraque": "iq", "Uzbequistão": "uz", "Ucrânia": "ua",
     "Polônia": "pl", "Chéquia": "cz", "Suécia": "se", "Suíça": "ch", "África do Sul": "za", "Nova Zelândia": "nz"
 };
 
-// 3. ESTRUTURA DOS 12 GRUPOS DA COPA 2026 (4 TIMES POR GRUPO)
+// 3. ESTRUTURA DOS 12 GRUPOS DA COPA 2026
 const GRUPOS = {
     A: ["Estados Unidos", "Jamaica", "Ucrânia", "África do Sul"],
     B: ["México", "Costa Rica", "Polônia", "Tunísia"],
@@ -47,18 +43,15 @@ const GRUPOS = {
     L: ["Croácia", "Marrocos", "Japão", "Coreia do Sul"]
 };
 
-// 4. GERAÇÃO AUTOMÁTICA DOS 72 JOGOS DA FASE DE GRUPOS (Evita arquivo gigante)
+// 4. GERAÇÃO AUTOMÁTICA DOS JOGOS
 const PARTIDAS = [];
 let idJogo = 1;
 Object.keys(GRUPOS).forEach(g => {
     const t = GRUPOS[g];
-    // Rodada 1
     PARTIDAS.push({ id: idJogo++, tA: t[0], tB: t[1], grupo: g, rodada: 1 });
     PARTIDAS.push({ id: idJogo++, tA: t[2], tB: t[3], grupo: g, rodada: 1 });
-    // Rodada 2
     PARTIDAS.push({ id: idJogo++, tA: t[0], tB: t[2], grupo: g, rodada: 2 });
     PARTIDAS.push({ id: idJogo++, tA: t[1], tB: t[3], grupo: g, rodada: 2 });
-    // Rodada 3
     PARTIDAS.push({ id: idJogo++, tA: t[3], tB: t[0], grupo: g, rodada: 3 });
     PARTIDAS.push({ id: idJogo++, tA: t[1], tB: t[2], grupo: g, rodada: 3 });
 });
@@ -68,39 +61,25 @@ function badge(time) {
     return c ? `<img src="https://flagcdn.com/w40/${c}.png" style="width:26px; border-radius:4px; vertical-align:middle; margin:0 6px;">` : '';
 }
 
-// 5. MOTOR DE CÁLCULO DE PONTOS REAL
 function calcularPontosUsuario(usuario, disputaId) {
-    let pontos totais = 0;
+    let pontosTotais = 0;
     const palpitesDoGrupo = pPlacar[disputaId] && pPlacar[disputaId][usuario];
-    
     if (!palpitesDoGrupo) return 0;
 
     Object.keys(RESULTADOS_REAIS).forEach(pId => {
         const real = RESULTADOS_REAIS[pId];
         const palpite = palpitesDoGrupo[pId];
-
         if (palpite && palpite.golA !== '' && palpite.golB !== '') {
-            const gA_real = parseInt(real.golA);
-            const gB_real = parseInt(real.golB);
-            const gA_pal = parseInt(palpite.golA);
-            const gB_pal = parseInt(palpite.golB);
-
-            // Cenário 1: Acerto em Cheio do Placar (25 pts)
-            if (gA_real === gA_pal && gB_real === gB_pal) {
-                pontosTotais += 25;
-            } 
-            // Cenário 2: Acerto da tendência/vencedor (10 pts)
-            else if ((gA_real > gB_real && gA_pal > gB_pal) || 
-                     (gA_real < gB_real && gA_pal < gB_pal) || 
-                     (gA_real === gB_real && gA_pal === gB_pal)) {
-                pontosTotais += 10;
-            }
+            const gA_real = parseInt(real.golA); const gB_real = parseInt(real.golB);
+            const gA_pal = parseInt(palpite.golA); const gB_pal = parseInt(palpite.golB);
+            if (gA_real === gA_pal && gB_real === gB_pal) { pontosTotais += 25; } 
+            else if ((gA_real > gB_real && gA_pal > gB_pal) || (gA_real < gB_real && gA_pal < gB_pal) || (gA_real === gB_real && gA_pal === gB_pal)) { pontosTotais += 10; }
         }
     });
     return pontosTotais;
 }
 
-// 6. ROTAS DO SISTEMA
+// 5. ROTAS DE AUTENTICAÇÃO (LOGIN E NOVO CADASTRO)
 app.post('/login', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     if (USUARIOS_CADASTRADOS[user] && USUARIOS_CADASTRADOS[user] === req.body.password) {
@@ -109,6 +88,26 @@ app.post('/login', (req, res) => {
         return res.redirect('/');
     }
     res.send("<h3>Usuário ou senha incorretos. <a href='/'>Voltar</a></h3>");
+});
+
+app.post('/cadastrar', (req, res) => {
+    const user = req.body.username.trim().toLowerCase();
+    const pass = req.body.password;
+
+    if (!user || !pass) {
+        return res.send("<h3>Usuário ou senha inválidos. <a href='/'>Voltar</a></h3>");
+    }
+    if (USUARIOS_CADASTRADOS[user]) {
+        return res.send("<h3>Este nome de usuário já está em uso! Escolha outro. <a href='/'>Voltar</a></h3>");
+    }
+
+    // Adiciona o amigo no banco de dados temporário
+    USUARIOS_CADASTRADOS[user] = pass;
+    
+    // Loga ele automaticamente após cadastrar
+    req.session.user = user;
+    req.session.dispId = req.session.convitePendente || "GLOBAL";
+    res.redirect('/');
 });
 
 app.post('/grupo/criar', (req, res) => {
@@ -146,15 +145,35 @@ app.get('/', (req, res) => {
 
     if (req.query.convite) { req.session.convitePendente = req.query.convite.trim().toUpperCase(); }
 
+    // TELA INICIAL INTEGRADA: LOGIN + SISTEMA DE CADASTRO PARA AMIGOS
     if (!req.session.user) {
-        return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #f59e0b;"><h2>🏆 ENTRAR NO BOLÃO</h2><form action="/login" method="POST"><input type="text" name="username" placeholder="Usuário (admin, thiago, sofia)" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Acessar Sistema</button></form></div></div>`);
+        return res.send(`${css}
+        <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; min-height:90vh; gap:30px; padding:20px;">
+            <div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:360px; border-top:6px solid #f59e0b;">
+                <h2 style="margin-top:0;">🔑 ENTRAR NO BOLÃO</h2>
+                <form action="/login" method="POST">
+                    <input type="text" name="username" placeholder="Nome de Usuário" required style="width:100%; margin-bottom:15px;">
+                    <input type="password" name="password" placeholder="Sua Senha" required style="width:100%; margin-bottom:20px;">
+                    <button type="submit" class="btn" style="width:100%;">Acessar Conta</button>
+                </form>
+            </div>
+            
+            <div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:360px; border-top:6px solid #10b981;">
+                <h2 style="margin-top:0; color:#10b981; border-left:5px solid #f59e0b;">✨ CRIAR NOVA CONTA</h2>
+                <p style="font-size:12px; color:#9ca3af; margin-bottom:15px;">Ainda não tem acesso? Escolha um nome de usuário e senha para começar a palpitar!</p>
+                <form action="/cadastrar" method="POST">
+                    <input type="text" name="username" placeholder="Escolha um Usuário (Ex: ronaldo)" required style="width:100%; margin-bottom:15px;">
+                    <input type="password" name="password" placeholder="Crie uma Senha" required style="width:100%; margin-bottom:20px;">
+                    <button type="submit" class="btn" style="width:100%; background:linear-gradient(135deg,#10b981,#059669);">Cadastrar e Entrar</button>
+                </form>
+            </div>
+        </div>`);
     }
 
     const u = req.session.user; 
     const dId = req.session.dispId;
     const dispAtual = disputasBase.find(d => d.id === dId) || disputasBase[0];
 
-    // Geração do Link de Convite Dinâmico usando a URL do seu Render
     let htmlLinkConvite = '';
     if (dispAtual.id !== 'GLOBAL') {
         const linkCompleto = `https://meu-bolao-2026.onrender.com/?convite=${dispAtual.id}`;
@@ -165,7 +184,7 @@ app.get('/', (req, res) => {
             </div>`;
     }
 
-    // RANKING VERDADEIRO CALCULADO EM TEMPO REAL
+    // RANKING REAL DINÂMICO CONFORME OS USUÁRIOS VÃO SE CADASTRANDO
     let participantesLista = Object.keys(USUARIOS_CADASTRADOS);
     let rankingCalculado = participantesLista.map(p => {
         return { nome: p, pontos: calcularPontosUsuario(p, dispAtual.id) };
@@ -177,12 +196,9 @@ app.get('/', (req, res) => {
     });
     htmlRanking += `</table>`;
 
-    // Filtro por Rodadas para os Placares (Evita travar a página)
     const rodadaAtiva = parseInt(req.query.rodada) || 1;
     let htmlAbas = `<div class="aba-container"><span style="align-self:center; font-weight:bold; margin-right:10px; color:#9ca3af;">Filtrar Rodada:</span>`;
-    [1, 2, 3].forEach(r => {
-        htmlAbas += `<a href="/?rodada=${r}" class="aba ${rodadaAtiva===r?'ativa':''}">${r}ª Rodada</a>`;
-    });
+    [1, 2, 3].forEach(r => { htmlAbas += `<a href="/?rodada=${r}" class="aba ${rodadaAtiva===r?'ativa':''}">${r}ª Rodada</a>`; });
     htmlAbas += `</div>`;
 
     let htmlG = '';
@@ -199,7 +215,6 @@ app.get('/', (req, res) => {
         partidasFiltradas.forEach(p => {
             const pal = (pPlacar[dispAtual.id] && pPlacar[dispAtual.id][u] && pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
             const resultadoReal = RESULTADOS_REAIS[p.id] ? `<span style="background:#1f2937; padding:4px 8px; border-radius:4px; font-size:11px; color:#f59e0b; margin-left:10px;">Placar Real: ${RESULTADOS_REAIS[p.id].golA}x${RESULTADOS_REAIS[p.id].golB}</span>` : '';
-            
             htmlP += `<div class="card-p"><form action="/palpite/placar" method="POST" style="display:flex; width:100%; justify-content:space-between; align-items:center; margin:0;"><input type="hidden" name="partidaId" value="${p.id}"><div style="font-size:11px; color:#10b981; font-weight:bold; width:60px;">GRP ${p.grupo} ${resultadoReal}</div><div class="row" style="justify-content:flex-end; text-align:right;"><span>${p.tA}</span> ${badge(p.tA)}</div><div style="display:flex; align-items:center; gap:5px;"><input type="number" name="golA" value="${pal.golA}" style="width:45px; text-align:center; padding:4px;"><span>X</span><input type="number" name="golB" value="${pal.golB}" style="width:45px; text-align:center; padding:4px;"></div><div class="row">${badge(p.tB)} <span>${p.tB}</span></div><button type="submit" class="btn" style="padding:4px 10px; font-size:12px;">Salvar</button></form></div>`;
         });
     }
@@ -216,7 +231,7 @@ app.get('/', (req, res) => {
         <div style="background:#111827; border:1px solid #1f2937; padding:20px; border-radius:12px; margin-bottom:20px;">
             <h3 style="color:#f59e0b; margin:0 0 15px 0; font-size:14px; text-transform:uppercase;">➕ Criar Novo Grupo de Disputa</h3>
             <form action="/grupo/criar" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; margin:0;">
-                <input type="text" name="nome" placeholder="Nome do Grupo (Ex: Galera do Futebol)" required style="flex:1; min-width:200px;">
+                <input type="text" name="nome" placeholder="Nome do Grupo (Ex: Galera da Quadra)" required style="flex:1; min-width:200px;">
                 <select name="modo" style="color:#f59e0b; font-weight:bold;">
                     <option value="ambos">Modo: Ambos (Grupos e Placares)</option>
                     <option value="grupos">Modo: Apenas Grupos</option>
