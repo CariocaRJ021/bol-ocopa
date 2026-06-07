@@ -8,13 +8,13 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'copa2026-key', resave: false, saveUninitialized: true }));
 
-// 1. BANCO DE DADOS EM MEMÓRIA
+// 1. BANCO DE DADOS EM MEMÓRIA (Agora aceita novos cadastros via formulário)
 const USUARIOS_CADASTRADOS = { "admin": "1234", "thiago": "1234", "sofia": "1234" };
 const disputasBase = [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }];
 const pClassif = {}; 
 const pPlacar = {};
 
-// 2. DICIONÁRIO DE BANDEIRAS OFICIAIS (Apenas as seleções dos Grupos A, B e C)
+// 2. DICIONÁRIO DE BANDEIRAS OFICIAIS
 const PAISES = { 
     "Estados Unidos": "us", "Jamaica": "jm", "Ucrânia": "ua", "África do Sul": "za",
     "México": "mx", "Costa Rica": "cr", "Polônia": "pl", "Tunísia": "tn",
@@ -30,15 +30,10 @@ const GRUPOS = {
 
 // 4. JOGOS REAIS DA 1ª RODADA ORGANIZADOS POR GRUPO
 const PARTIDAS = [
-    // Grupo A - Rodada 1
     { id: 1, tA: "Estados Unidos", tB: "Jamaica", grupo: "A" },
     { id: 2, tA: "Ucrânia", tB: "África do Sul", grupo: "A" },
-    
-    // Grupo B - Rodada 1
     { id: 3, tA: "México", tB: "Costa Rica", grupo: "B" },
     { id: 4, tA: "Polônia", tB: "Tunísia", grupo: "B" },
-    
-    // Grupo C - Rodada 1
     { id: 5, tA: "Canadá", tB: "Panamá", grupo: "C" },
     { id: 6, tA: "Chéquia", tB: "Argélia", grupo: "C" }
 ];
@@ -48,7 +43,7 @@ function badge(time) {
     return c ? `<img src="https://flagcdn.com/w40/${c}.png" style="width:26px; border-radius:4px; vertical-align:middle; margin:0 6px;">` : '';
 }
 
-// 5. ROTAS DO SISTEMA
+// 5. ROTAS DE AUTENTICAÇÃO (LOGIN E CADASTRO)
 app.post('/login', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     if (USUARIOS_CADASTRADOS[user] && USUARIOS_CADASTRADOS[user] === req.body.password) {
@@ -59,6 +54,27 @@ app.post('/login', (req, res) => {
     res.send("<h3>Erro! Usuário ou senha inválidos. <a href='/'>Voltar</a></h3>");
 });
 
+app.post('/cadastrar', (req, res) => {
+    const user = req.body.username.trim().toLowerCase();
+    const pass = req.body.password;
+
+    if (!user || !pass) {
+        return res.send("<h3>Erro! Usuário e senha são obrigatórios. <a href='/?tela=cadastro'>Voltar</a></h3>");
+    }
+    if (USUARIOS_CADASTRADOS[user]) {
+        return res.send("<h3>Erro! Este usuário já existe. Escolha outro nome. <a href='/?tela=cadastro'>Voltar</a></h3>");
+    }
+
+    // Salva o novo amigo na memória do servidor
+    USUARIOS_CADASTRADOS[user] = pass;
+    
+    // Faz o login automático do novo usuário
+    req.session.user = user;
+    req.session.dispId = req.session.convitePendente || "GLOBAL";
+    res.redirect('/');
+});
+
+// ROTAS DE GERENCIAMENTO DE DISPUTAS E PALPITES
 app.post('/grupo/criar', (req, res) => {
     const codigoUnico = 'COPA-' + Math.random().toString(36).substr(2, 4).toUpperCase();
     disputasBase.push({ id: codigoUnico, nome: req.body.nome, modo: req.body.modo });
@@ -89,16 +105,23 @@ app.post('/palpite/placar', (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// 6. INTERFACE VISUAL
+// 6. INTERFACE VISUAL COM CHAVEAMENTO DE TELA
 app.get('/', (req, res) => {
-    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;}select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:300px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
+    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px; transition: 0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:300px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
 
     if (req.query.convite) {
         req.session.convitePendente = req.query.convite.trim().toUpperCase();
     }
 
+    // Tela de login e cadastro dinâmico para quem não está logado
     if (!req.session.user) {
-        return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #f59e0b;"><h2>🏆 ENTRAR NO BOLÃO</h2><form action="/login" method="POST"><input type="text" name="username" placeholder="Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Acessar Sistema</button></form></div></div>`);
+        const querCadastro = req.query.tela === 'cadastro';
+        
+        if (querCadastro) {
+            return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #10b981;"><h2>📝 CRIAR CONTA NO BOLÃO</h2><form action="/cadastrar" method="POST"><input type="text" name="username" placeholder="Escolha um Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Defina uma Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Finalizar Cadastro e Entrar</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/" style="color:#f59e0b; text-decoration:none;">Já tem conta? Faça Login</a></p></div></div>`);
+        } else {
+            return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #f59e0b;"><h2>🏆 ENTRAR NO BOLÃO</h2><form action="/login" method="POST"><input type="text" name="username" placeholder="Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Acessar Sistema</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/?tela=cadastro" style="color:#10b981; text-decoration:none; font-weight:bold;">Não tem uma conta? Cadastre-se aqui</a></p></div></div>`);
+        }
     }
 
     const u = req.session.user; 
@@ -116,7 +139,11 @@ app.get('/', (req, res) => {
     }
 
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
-    ["thiago", "sofia", "admin"].forEach((p, index) => {
+    // Lista dinamicamente o usuário logado se ele for novo
+    const listaJogadores = ["thiago", "sofia", "admin"];
+    if (!listaJogadores.includes(u)) { listaJogadores.push(u); }
+
+    listaJogadores.forEach((p, index) => {
         let pontosSimulados = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0);
         htmlRanking += `<tr><td><strong>${index + 1}º</strong></td><td>${p.toUpperCase()}</td><td style="color:#10b981; font-weight:bold;">${pontosSimulados} pts</td></tr>`;
     });
