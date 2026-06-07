@@ -99,9 +99,9 @@ Object.keys(GRUPOS).forEach(g => {
 for (let i = 1; i <= 16; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `16avos - Jg ${i}`, fase: "16avos" }); }
 for (let i = 1; i <= 8; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Oitavas - Jg ${i}`, fase: "oitavas" }); }
 for (let i = 1; i <= 4; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Quartas - Jg ${i}`, fase: "quartas" }); }
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Semifinal 1", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Semifinal 2", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Grande Final", fase: "final" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 1", fase: "semis" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 2", fase: "semis" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Grande Final", fase: "final" });
 
 const NOMES_FASES = {
     "r1": "Fase de Grupos - 1ª Rodada", "r2": "Fase de Grupos - 2ª Rodada", "r3": "Fase de Grupos - 3ª Rodada",
@@ -151,12 +151,15 @@ function calcularPontosClassif(palpite, real) {
     return 0;
 }
 
+// SCRIPT MELHORADO: Controla os selects do admin e gerencia a memória de posição do Scroll (LocalStorage)
 const SCRIPT_DINAMICO = `
 <script>
     const gruposData = ${JSON.stringify(GRUPOS)};
+    
     function atualizarSeletorPaises(grupoLetra) {
         const p1 = document.getElementById('admin_primeiro');
         const p2 = document.getElementById('admin_segundo');
+        if(!p1 || !p2) return;
         const paises = gruposData[grupoLetra] || [];
         
         p1.innerHTML = '<option value="">Escolha o 1º</option>';
@@ -167,9 +170,24 @@ const SCRIPT_DINAMICO = `
             p2.innerHTML += \`<option value="\${p}">\${p}</option>\`;
         });
     }
+
+    // Grava a posição do Scroll quando o usuário move a tela
+    window.addEventListener('scroll', function() {
+        localStorage.setItem('bolao_scroll_pos', window.scrollY);
+    });
+
     window.onload = function() {
         const selectGrupo = document.getElementById('admin_select_grupo');
         if(selectGrupo) { atualizarSeletorPaises(selectGrupo.value); }
+
+        // Restaura a posição salva do scroll se ela existir
+        const posSalva = localStorage.getItem('bolao_scroll_pos');
+        if (posSalva) {
+            window.scrollTo({
+                top: parseInt(posSalva),
+                behavior: 'instant'
+            });
+        }
     }
 </script>
 `;
@@ -410,7 +428,7 @@ app.get('/', (req, res) => {
             }
         }
 
-        listaPontuou.push({ nome: jogador, pontos: totalPontos });
+        listaPontuou.push({ nome: joker = jogador, pontos: totalPontos });
     });
 
     listaPontuou.sort((a, b) => b.pontos - a.pontos);
@@ -518,11 +536,9 @@ app.get('/', (req, res) => {
                 </div>
 
             </div>
-        </div>
-        ${SCRIPT_DINAMICO}`;
+        </div>`;
     }
 
-    // ALTERAÇÃO DO FLUXO VISUAL AQUI: Seletor de fases agora renderiza grudado nos placares da rodada
     res.send(`${css}<div class="container">
         ${htmlTopo}
         ${htmlCriadorGrupo}
@@ -533,7 +549,8 @@ app.get('/', (req, res) => {
         ${htmlSeletorFases}
         ${htmlP ? `<h2>2. Placares da Rodada</h2><div>${htmlP}</div>` : ''}
         ${htmlAdmin}
-    </div>`);
+    </div>
+    ${SCRIPT_DINAMICO}`); // Script injetado globalmente no fim do body
 });
 
 app.listen(PORT, () => console.log(`Servidor ativo na porta ${PORT}`));
