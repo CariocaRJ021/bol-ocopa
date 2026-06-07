@@ -31,7 +31,11 @@ function carregarDados() {
     }
 }
 function salvarDados() {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(DB, null, 2), 'utf8');
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(DB, null, 2), 'utf8');
+    } catch (e) {
+        console.error("Erro ao salvar dados:", e);
+    }
 }
 carregarDados();
 
@@ -99,7 +103,7 @@ for (let i = 1; i <= 8; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir",
 for (let i = 1; i <= 4; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Quartas - Jg ${i}`, fase: "quartas" }); }
 PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 1", fase: "semis" });
 PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 2", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Grande Final", fase: "final" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Grande Final", fase: "final" });
 
 const NOMES_FASES = {
     "r1": "Fase de Grupos - 1ª Rodada", "r2": "Fase de Grupos - 2ª Rodada", "r3": "Fase de Grupos - 3ª Rodada",
@@ -147,7 +151,7 @@ app.post('/cadastrar', (req, res) => {
     res.redirect('/');
 });
 
-// --- SOLUÇÃO DO PROBLEMA: MAPEANDO POST E GET PARA EVITAR FALHAS DE ROTAS ---
+// --- SEGURANÇA DE ROTAS ---
 app.post('/fase/selecionar', (req, res) => {
     req.session.faseAtiva = req.body.faseId;
     res.redirect('/');
@@ -169,7 +173,7 @@ app.post('/grupo/entrar', (req, res) => {
     const cod = req.body.codigo.trim().toUpperCase();
     const grupoEncontrado = DB.disputas.find(g => g.id === cod);
     if (grupoEncontrado) { 
-        req.session.dispId = groupEncontrado.id; 
+        req.session.dispId = grupoEncontrado.id; 
         vincularAoGrupo(grupoEncontrado.id, req.session.user);
     }
     res.redirect('/');
@@ -183,7 +187,8 @@ app.post('/disputa/selecionar', (req, res) => {
 app.post('/palpite/grupo', (req, res) => {
     const { grupo, primeiro, segundo } = req.body; 
     const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
-    if (!DB.pClassif[dId]) DB.pClassif[dId] = {}; if (!DB.pClassif[dId][u]) DB.pClassif[dId][u] = {};
+    if (!DB.pClassif[dId]) DB.pClassif[dId] = {}; 
+    if (!DB.pClassif[dId][u]) DB.pClassif[dId][u] = {};
     DB.pClassif[dId][u][grupo] = { primeiro, segundo };
     salvarDados();
     res.redirect('/');
@@ -192,7 +197,8 @@ app.post('/palpite/grupo', (req, res) => {
 app.post('/palpite/placar', (req, res) => {
     const { partidaId, golA, golB } = req.body; 
     const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
-    if (!DB.pPlacar[dId]) DB.pPlacar[dId] = {}; if (!DB.pPlacar[dId][u]) DB.pPlacar[dId][u] = {};
+    if (!DB.pPlacar[dId]) DB.pPlacar[dId] = {}; 
+    if (!DB.pPlacar[dId][u]) DB.pPlacar[dId][u] = {};
     DB.pPlacar[dId][u][partidaId] = { golA, golB };
     salvarDados();
     res.redirect('/');
@@ -200,9 +206,9 @@ app.post('/palpite/placar', (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// --- INTERFACE WEB COMPLETA ---
+// --- ROTA INTERFACE PRINCIPAL ---
 app.get('/', (req, res) => {
-    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
+    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;} .container{max-width:1100px;margin:auto;} h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;} .btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;} .grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;} .card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;} .card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;} .row{display:flex;align-items:center;gap:10px;width:38%;} table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;} th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;} th{background:#10b981;color:#fff;}</style>`;
 
     if (req.query.convite) { req.session.convitePendente = req.query.convite.trim().toUpperCase(); }
 
@@ -241,79 +247,4 @@ app.get('/', (req, res) => {
     <div style="background:#111827; border:1px solid #1f2937; padding:20px; border-radius:12px; margin-bottom:20px;">
         <h3 style="color:#f59e0b; margin:0 0 15px 0; font-size:14px; text-transform:uppercase;">➕ Criar Novo Grupo de Disputa</h3>
         <form action="/grupo/criar" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; margin:0;">
-            <input type="text" name="nome" placeholder="Nome do Grupo" required style="flex:1; min-width:200px;">
-            <select name="modo" style="color:#f59e0b; font-weight:bold; background:#1f2937; border:1px solid #374151; border-radius:6px; padding:8px;">
-                <option value="ambos">Modo: Ambos (Grupos e Rodadas)</option>
-                <option value="groups">Modo: Apenas Grupos</option>
-                <option value="rounds">Modo: Apenas Rodadas</option>
-            </select>
-            <button type="submit" class="btn">Gerar Grupo Privado</button>
-        </form>
-    </div>`;
-
-    let htmlSeletorFases = '';
-    if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
-        htmlSeletorFases = `
-        <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
-            <span style="font-size:14px; font-weight:bold; color:#9ca3af;">📅 Alternar Rodada do Bolão:</span>
-            <form action="/fase/selecionar" method="POST" style="margin:0; display:flex; gap:10px;">
-                <select name="faseId" style="color:#10b981; font-weight:bold; background:#1f2937; border:1px solid #374151; border-radius:6px; padding:8px;">
-                    ${Object.keys(NOMES_FASES).map(fId => `<option value="${fId}" ${faseAtiva===fId?'selected':''}>${NOMES_FASES[fId]}</option>`).join('')}
-                </select>
-                <button type="submit" class="btn" style="padding:5px 12px;">Visualizar</button>
-            </form>
-        </div>`;
-    }
-
-    let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
-    const competidores = DB.membros[dispAtual.id] || [u];
-    competidores.forEach((p, index) => {
-        let pontos = 0;
-        if (dispAtual.id === "GLOBAL") { pontos = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0); }
-        htmlRanking += `<tr><td><strong>${index + 1}º</strong></td><td>${p.toUpperCase()}</td><td style="color:#10b981; font-weight:bold;">${pontos} pts</td></tr>`;
-    });
-    htmlRanking += `</table>`;
-
-    let htmlG = '';
-    if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
-        Object.keys(GRUPOS).forEach(g => {
-            const pal = (DB.pClassif[dispAtual.id] && DB.pClassif[dispAtual.id][u] && DB.pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
-            htmlG += `<div class="card-g" style="margin-bottom:15px;">
-                <h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3>
-                ${GRUPOS[g].map(t => `<div style="margin:4px 0; font-size:14px;">${badge(t)} ${t}</div>`).join('')}
-                <form action="/palpite/grupo" method="POST" style="margin-top:15px;">
-                    <input type="hidden" name="grupo" value="${g}">
-                    <select name="primeiro" style="width:100%; margin-bottom:5px; background:#1f2937; color:#fff; border:1px solid #374151; padding:5px; border-radius:4px;"><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</select>
-                    <select name="segundo" style="width:100%; margin-bottom:10px; background:#1f2937; color:#fff; border:1px solid #374151; padding:5px; border-radius:4px;"><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select>
-                    <button type="submit" class="btn" style="width:100%; padding:4px; font-size:12px;">Salvar Grupo</button>
-                </form>
-            </div>`;
-        });
-    }
-
-    let htmlP = '';
-    if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
-        const jogosFase = PARTIDAS.filter(p => p.fase === faseAtiva);
-        jogosFase.forEach(p => {
-            const pal = (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][u] && DB.pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
-            htmlP += `<div class="card-p">
-                <form action="/palpite/placar" method="POST" style="display:flex; width:100%; justify-content:space-between; align-items:center; margin:0;">
-                    <input type="hidden" name="partidaId" value="${p.id}">
-                    <div style="font-size:11px; color:#10b981; font-weight:bold; width:80px;">${p.grupo.toUpperCase()}</div>
-                    <div class="row" style="justify-content:flex-end; text-align:right;"><span>${p.tA}</span> ${badge(p.tA)}</div>
-                    <div style="display:flex; align-items:center; gap:5px;"><input type="number" name="golA" value="${pal.golA}" style="width:45px; text-align:center; background:#1f2937; color:#fff; border:1px solid #374151; border-radius:4px;"><span>X</span><input type="number" name="golB" value="${pal.golB}" style="width:45px; text-align:center; background:#1f2937; color:#fff; border:1px solid #374151; border-radius:4px;"></div>
-                    <div class="row">${badge(p.tB)} <span>${p.tB}</span></div>
-                    <button type="submit" class="btn" style="padding:4px 10px; font-size:12px;">Salvar</button>
-                </form>
-            </div>`;
-        });
-    }
-
-    res.send(`${css}<div class="container">
-        ${htmlTopo}
-        ${htmlCriadorGrupo}
-        ${htmlLinkConvite}
-        ${htmlSeletorFases}
-        ${htmlRanking}
-        ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
-        ${htmlP ? `<h2>2. Placares da Rodada
+            <input type="text" name="nome" placeholder="Nome do Grupo" required style="flex:1; min-width:2
