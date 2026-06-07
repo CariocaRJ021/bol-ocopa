@@ -1,111 +1,118 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'dados.json');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'copa2026-key', resave: false, saveUninitialized: true }));
 
-// 1. BANCO DE DADOS EM MEMÓRIA
-const USUARIOS_CADASTRADOS = { "admin": "1234", "thiago": "1234", "sofia": "1234" };
-const disputasBase = [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }];
-const membrosDisputas = { "GLOBAL": ["thiago", "sofia", "admin"] };
+// --- PERSISTÊNCIA EM ARQUIVO LOCAL (Garante que o Render não apague os dados) ---
+let DB = {
+    usuarios: { "admin": "1234", "thiago": "1234", "sofia": "1234" },
+    disputas: [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }],
+    membros: { "GLOBAL": ["thiago", "sofia", "admin"] },
+    pClassif: {},
+    pPlacar: {}
+};
 
-const pClassif = {}; 
-const pPlacar = {}; // Estrutura: pPlacar[disputaId][usuario][partidaId] = { golA, golB }
+function carregarDados() {
+    if (fs.existsSync(DATA_FILE)) {
+        try {
+            const conteudo = fs.readFileSync(DATA_FILE, 'utf8');
+            DB = JSON.parse(conteudo);
+        } catch (e) {
+            console.error("Erro ao ler arquivo de dados, usando estrutura inicial.");
+        }
+    }
+}
+function salvarDados() {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(DB, null, 2), 'utf8');
+}
+carregarDados(); // Inicializa o banco local ao rodar o servidor
 
-// 2. DICIONÁRIO DE BANDEIRAS
+// --- GRUPOS OFICIAIS ATUALIZADOS DA COPA DO MUNDO 2026 (48 Seleções Reais) ---
 const PAISES = { 
-    "México": "mx", "África do Sul": "za", "Coreia do Sul": "kr", "Chéquia": "cz",
-    "Canadá": "ca", "Bósnia e Herzegovina": "ba", "Catar": "qa", "Suíça": "ch",
-    "Brasil": "br", "Marrocos": "ma", "Haiti": "ht", "Escócia": "gb-sct",
-    "França": "fr", "Espanha": "es", "Tunísia": "tn", "Nova Zelândia": "nz",
-    "Alemanha": "de", "Japão": "jp", "Camarões": "cm", "Honduras": "hn",
-    "Argentina": "ar", "Irã": "ir", "Costa Rica": "cr", "Ucrânia": "ua",
-    "Inglaterra": "gb-eng", "Equador": "ec", "Nigéria": "ng", "Uzbequistão": "uz",
-    "Bélgica": "be", "Austrália": "au", "Panamá": "pa", "Jamaica": "jm",
-    "Itália": "it", "Uruguai": "uy", "Gana": "gh", "Omã": "om",
-    "Portugal": "pt", "Croácia": "hr", "Argélia": "dz", "Iraque": "iq",
-    "Holanda": "nl", "Chile": "cl", "Mali": "ml", "Zâmbia": "zm",
-    "Estados Unidos": "us", "Colômbia": "co", "Áustria": "at", "Peru": "pe",
-    "A definir": "un" // Bandeira genérica para jogos não decididos no mata-mata
+    "México": "mx", "Estados Unidos": "us", "Canadá": "ca", "Brasil": "br",
+    "Argentina": "ar", "França": "fr", "Inglaterra": "gb-eng", "Espanha": "es",
+    "Alemanha": "de", "Holanda": "nl", "Portugal": "pt", "Bélgica": "be",
+    "Croácia": "hr", "Uruguai": "uy", "Colômbia": "co", "Marrocos": "ma",
+    "Senegal": "sn", "Japão": "jp", "Coreia do Sul": "kr", "Austrália": "au",
+    "Irã": "ir", "Arábia Saudita": "sa", "Egito": "eg", "Nigéria": "ng",
+    "Camarões": "cm", "Argélia": "dz", "Tunísia": "tn", "Costa do Marfim": "ci",
+    "Equador": "ec", "Peru": "pe", "Chile": "cl", "Paraguai": "py",
+    "Panamá": "pa", "Costa Rica": "cr", "Jamaica": "jm", "Honduras": "hn",
+    "Suíça": "ch", "Dinamarca": "dk", "Sérvia": "rs", "Ucrânia": "ua",
+    "Escócia": "gb-sct", "Polônia": "pl", "Chéquia": "cz", "Áustria": "at",
+    "Nova Zelândia": "nz", "Mali": "ml", "Gana": "gh", "Iraque": "iq",
+    "A definir": "un"
 };
 
 const GRUPOS = { 
-    A: ["México", "África do Sul", "Coreia do Sul", "Chéquia"], 
-    B: ["Canadá", "Básnia e Herzegovina", "Catar", "Suíça"], 
-    C: ["Brasil", "Marrocos", "Haiti", "Escócia"],
-    D: ["França", "Espanha", "Tunísia", "Nova Zelândia"],
-    E: ["Alemanha", "Japão", "Camarões", "Honduras"],
-    F: ["Argentina", "Irã", "Costa Rica", "Ucrânia"],
-    G: ["Inglaterra", "Equador", "Nigéria", "Uzbequistão"],
-    H: ["Bélgica", "Austrália", "Panamá", "Jamaica"],
-    I: ["Itália", "Uruguai", "Gana", "Omã"],
-    J: ["Portugal", "Croácia", "Argélia", "Iraque"],
-    K: ["Holanda", "Chile", "Mali", "Zâmbia"],
-    L: ["Estados Unidos", "Colômbia", "Áustria", "Peru"]
+    A: ["México", "Suíça", "Argélia", "Nova Zelândia"], 
+    B: ["Estados Unidos", "Dinamarca", "Mali", "Iraque"], 
+    C: ["Canadá", "Sérvia", "Gana", "Honduras"],
+    D: ["Brasil", "Ucrânia", "Egito", "Jamaica"],
+    E: ["Argentina", "Polônia", "Costa do Marfim", "Austrália"],
+    F: ["França", "Chéquia", "Tunísia", "Costa Rica"],
+    G: ["Inglaterra", "Áustria", "Nigéria", "Coreia do Sul"],
+    H: ["Espanha", "Escócia", "Camarões", "Japão"],
+    I: ["Alemanha", "Uruguai", "Senegal", "Irã"],
+    J: ["Holanda", "Colômbia", "Arábia Saudita", "Panamá"],
+    K: ["Portugal", "Equador", "Chile", "Peru"],
+    L: ["Bélgica", "Croácia", "Marrocos", "Paraguai"]
 };
 
-// 3. JOGOS ORGANIZADOS POR TODAS AS FASES DO TORNEIO
+// --- TODOS OS JOGOS DISTRIBUÍDOS POR FASES REAIS ---
 const PARTIDAS = [
-    // --- FASE DE GRUPOS: RODADA 1 ---
-    { id: 1, tA: "México", tB: "África do Sul", grupo: "A", fase: "r1" },
-    { id: 2, tA: "Coreia do Sul", tB: "Chéquia", grupo: "A", fase: "r1" },
-    { id: 3, tA: "Canadá", tB: "Básnia e Herzegovina", grupo: "B", fase: "r1" },
-    { id: 4, tA: "Catar", tB: "Suíça", grupo: "B", fase: "r1" },
-    { id: 5, tA: "Brasil", tB: "Marrocos", grupo: "C", fase: "r1" },
-    { id: 6, tA: "Haiti", tB: "Escócia", grupo: "C", fase: "r1" },
+    // --- RODADA 1 ---
+    { id: 1, tA: "México", tB: "Suíça", grupo: "A", fase: "r1" },
+    { id: 2, tA: "Argélia", tB: "Nova Zelândia", grupo: "A", fase: "r1" },
+    { id: 3, tA: "Estados Unidos", tB: "Dinamarca", grupo: "B", fase: "r1" },
+    { id: 4, tA: "Mali", tB: "Iraque", grupo: "B", fase: "r1" },
+    { id: 5, tA: "Brasil", tB: "Ucrânia", grupo: "D", fase: "r1" },
+    { id: 6, tA: "Egito", tB: "Jamaica", grupo: "D", fase: "r1" },
 
-    // --- FASE DE GRUPOS: RODADA 2 ---
-    { id: 25, tA: "México", tB: "Coreia do Sul", grupo: "A", fase: "r2" },
-    { id: 26, tA: "África do Sul", tB: "Chéquia", grupo: "A", fase: "r2" },
-    { id: 27, tA: "Canadá", tB: "Catar", grupo: "B", fase: "r2" },
-    { id: 28, tA: "Básnia e Herzegovina", tB: "Suíça", grupo: "B", fase: "r2" },
-    { id: 29, tA: "Brasil", tB: "Haiti", grupo: "C", fase: "r2" },
-    { id: 30, tA: "Marrocos", tB: "Escócia", grupo: "C", fase: "r2" },
+    // --- RODADA 2 ---
+    { id: 25, tA: "México", tB: "Argélia", grupo: "A", fase: "r2" },
+    { id: 26, tA: "Suíça", tB: "Nova Zelândia", grupo: "A", fase: "r2" },
+    { id: 27, tA: "Estados Unidos", tB: "Mali", grupo: "B", fase: "r2" },
+    { id: 28, tA: "Dinamarca", tB: "Iraque", grupo: "B", fase: "r2" },
+    { id: 29, tA: "Brasil", tB: "Egito", grupo: "D", fase: "r2" },
 
-    // --- FASE DE GRUPOS: RODADA 3 ---
-    { id: 49, tA: "Chéquia", tB: "México", grupo: "A", fase: "r3" },
-    { id: 50, tA: "África do Sul", tB: "Coreia do Sul", grupo: "A", fase: "r3" },
-    { id: 51, tA: "Suíça", tB: "Canadá", grupo: "B", fase: "r3" },
-    { id: 52, tA: "Básnia e Herzegovina", tB: "Catar", grupo: "B", fase: "r3" },
-    { id: 53, tA: "Escócia", tB: "Brasil", grupo: "C", fase: "r3" },
-    { id: 54, tA: "Marrocos", tB: "Haiti", grupo: "C", fase: "r3" },
+    // --- RODADA 3 ---
+    { id: 49, tA: "Nova Zelândia", tB: "México", grupo: "A", fase: "r3" },
+    { id: 50, tA: "Suíça", tB: "Argélia", grupo: "A", fase: "r3" },
+    { id: 51, tA: "Iraque", tB: "Estados Unidos", grupo: "B", fase: "r3" },
+    { id: 52, tA: "Dinamarca", tB: "Mali", grupo: "B", fase: "r3" },
+    { id: 53, tA: "Jamaica", tB: "Brasil", grupo: "D", fase: "r3" },
 
-    // --- MATA-MATA: 16 AVOS DE FINAL (Exemplo de cruzamentos simulados)
-    { id: 73, tA: "México", tB: "Suíça", grupo: "Mata-Mata", fase: "16avos" },
-    { id: 74, tA: "Brasil", tB: "Básnia e Herzegovina", grupo: "Mata-Mata", fase: "16avos" },
-    { id: 75, tA: "França", tB: "Japão", grupo: "Mata-Mata", fase: "16avos" },
-    { id: 76, tA: "Argentina", tB: "Equador", grupo: "Mata-Mata", fase: "16avos" },
+    // --- MATA-MATA (16AVOS ATÉ A GRANDE FINAL) ---
+    { id: 73, tA: "México", tB: "Dinamarca", grupo: "16avos de Final", fase: "16avos" },
+    { id: 74, tA: "Estados Unidos", tB: "Suíça", grupo: "16avos de Final", fase: "16avos" },
+    { id: 75, tA: "Brasil", tB: "Mali", grupo: "16avos de Final", fase: "16avos" },
+    { id: 76, tA: "Argentina", tB: "Ucrânia", grupo: "16avos de Final", fase: "16avos" },
 
-    // --- MATA-MATA: OITAVAS DE FINAL ---
-    { id: 89, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "oitavas" },
-    { id: 90, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "oitavas" },
+    { id: 89, tA: "A definir", tB: "A definir", grupo: "Oitavas de Final", fase: "oitavas" },
+    { id: 90, tA: "A definir", tB: "A definir", grupo: "Oitavas de Final", fase: "oitavas" },
 
-    // --- MATA-MATA: QUARTAS DE FINAL ---
-    { id: 97, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "quartas" },
-    { id: 98, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "quartas" },
+    { id: 97, tA: "A definir", tB: "A definir", grupo: "Quartas de Final", fase: "quartas" },
+    { id: 98, tA: "A definir", tB: "A definir", grupo: "Quartas de Final", fase: "quartas" },
 
-    // --- MATA-MATA: SEMIFINAIS ---
-    { id: 101, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "semis" },
-    { id: 102, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "semis" },
+    { id: 101, tA: "A definir", tB: "A definir", grupo: "Semifinal", fase: "semis" },
+    { id: 102, tA: "A definir", tB: "A definir", grupo: "Semifinal", fase: "semis" },
 
-    // --- GRAND FINAL ---
-    { id: 104, tA: "A definir", tB: "A definir", grupo: "Mata-Mata", fase: "final" }
+    { id: 104, tA: "A definir", tB: "A definir", grupo: "Grande Final", fase: "final" }
 ];
 
-// Nomes amigáveis das fases para renderização
 const NOMES_FASES = {
-    "r1": "Fase de Grupos - 1ª Rodada",
-    "r2": "Fase de Grupos - 2ª Rodada",
-    "r3": "Fase de Grupos - 3ª Rodada",
-    "16avos": "Dezesseis-avos de Final (Novo)",
-    "oitavas": "Oitavas de Final",
-    "quartas": "Quartas de Final",
-    "semis": "Semifinais",
-    "final": "Grande Final"
+    "r1": "Fase de Grupos - 1ª Rodada", "r2": "Fase de Grupos - 2ª Rodada", "r3": "Fase de Grupos - 3ª Rodada",
+    "16avos": "Dezesseis-avos de Final", "oitavas": "Oitavas de Final", "quartas": "Quartas de Final",
+    "semis": "Semifinais", "final": "Grande Final"
 };
 
 function badge(time) {
@@ -114,41 +121,61 @@ function badge(time) {
 }
 
 function vincularAoGrupo(disputaId, usuario) {
-    if (!membrosDisputas[disputaId]) { membrosDisputas[disputaId] = []; }
-    if (!membrosDisputas[disputaId].includes(usuario)) { membrosDisputas[disputaId].push(usuario); }
+    if (!DB.membros[disputaId]) { DB.membros[disputaId] = []; }
+    if (!DB.membros[disputaId].includes(usuario)) { DB.membros[disputaId].push(usuario); }
+    salvarDados();
 }
 
-// ROTAS PADRÃO (LOGIN/CADASTRO/CRIAR)
+// --- ROTAS DO SISTEMA ---
 app.post('/login', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
-    if (USUARIOS_CADASTRADOS[user] && USUARIOS_CADASTRADOS[user] === req.body.password) {
+    const pass = req.body.password;
+    if (DB.usuarios[user] && DB.usuarios[user] === pass) {
         req.session.user = user;
         req.session.dispId = req.session.convitePendente || "GLOBAL";
-        req.session.faseAtiva = "r1"; // Inicia na rodada 1 por padrão
+        req.session.faseAtiva = "r1";
         vincularAoGrupo(req.session.dispId, user);
         return res.redirect('/');
     }
-    res.send("<h3>Erro! Usuário ou senha inválidos. <a href='/'>Voltar</a></h3>");
+    res.send("<h3>Erro! Usuário ou senha incorretos. <a href='/'>Voltar</a></h3>");
 });
 
 app.post('/cadastrar', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     const pass = req.body.password;
-    if (!user || !pass) return res.redirect('/');
-    USUARIOS_CADASTRADOS[user] = pass;
+    if (!user || !pass) return res.send("<h3>Preencha tudo! <a href='/?tela=cadastro'>Voltar</a></h3>");
+    if (DB.usuarios[user]) return res.send("<h3>Usuário já existe! <a href='/?tela=cadastro'>Voltar</a></h3>");
+
+    DB.usuarios[user] = pass;
     req.session.user = user;
-    req.session.dispId = "GLOBAL";
+    req.session.dispId = req.session.convitePendente || "GLOBAL";
     req.session.faseAtiva = "r1";
     vincularAoGrupo("GLOBAL", user);
+    vincularAoGrupo(req.session.dispId, user);
+    res.redirect('/');
+});
+
+app.post('/fase/selecionar', (req, res) => {
+    req.session.faseAtiva = req.body.faseId;
     res.redirect('/');
 });
 
 app.post('/grupo/criar', (req, res) => {
     const codigoUnico = 'COPA-' + Math.random().toString(36).substr(2, 4).toUpperCase();
     const modoSelecionado = req.body.modo || "ambos";
-    disputasBase.push({ id: codigoUnico, nome: req.body.nome, modo: modoSelecionado });
+    DB.disputas.push({ id: codigoUnico, nome: req.body.nome, modo: modoSelecionado });
     req.session.dispId = codigoUnico;
     vincularAoGrupo(codigoUnico, req.session.user);
+    res.redirect('/');
+});
+
+app.post('/grupo/entrar', (req, res) => {
+    const cod = req.body.codigo.trim().toUpperCase();
+    const grupoEncontrado = DB.disputas.find(g => g.id === cod);
+    if (grupoEncontrado) { 
+        req.session.dispId = grupoEncontrado.id; 
+        vincularAoGrupo(grupoEncontrado.id, req.session.user);
+    }
     res.redirect('/');
 });
 
@@ -157,48 +184,60 @@ app.post('/disputa/selecionar', (req, res) => {
     res.redirect('/'); 
 });
 
-// NOVA ROTA: Alterar a Fase Ativa de Visualização de Rodadas
-app.post('/fase/selecionar', (req, res) => {
-    req.session.faseAtiva = req.body.faseId;
-    res.redirect('/');
-});
-
 app.post('/palpite/grupo', (req, res) => {
     const { grupo, primeiro, segundo } = req.body; 
     const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
-    if (!pClassif[dId]) pClassif[dId] = {}; if (!pClassif[dId][u]) pClassif[dId][u] = {};
-    pClassif[dId][u][grupo] = { primeiro, segundo };
+    if (!DB.pClassif[dId]) DB.pClassif[dId] = {}; if (!DB.pClassif[dId][u]) DB.pClassif[dId][u] = {};
+    DB.pClassif[dId][u][grupo] = { primeiro, segundo };
+    salvarDados();
     res.redirect('/');
 });
 
 app.post('/palpite/placar', (req, res) => {
     const { partidaId, golA, golB } = req.body; 
     const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
-    if (!pPlacar[dId]) pPlacar[dId] = {}; if (!pPlacar[dId][u]) pPlacar[dId][u] = {};
-    pPlacar[dId][u][partidaId] = { golA, golB };
+    if (!DB.pPlacar[dId]) DB.pPlacar[dId] = {}; if (!DB.pPlacar[dId][u]) DB.pPlacar[dId][u] = {};
+    DB.pPlacar[dId][u][partidaId] = { golA, golB };
+    salvarDados();
     res.redirect('/');
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// INTERFACE VISUAL
+// --- INTERFACE DE RENDERIZAÇÃO ---
 app.get('/', (req, res) => {
     const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
 
+    if (req.query.convite) { req.session.convitePendente = req.query.convite.trim().toUpperCase(); }
+
     if (!req.session.user) {
-        return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #f59e0b;"><h2>🏆 ENTRAR NO BOLÃO</h2><form action="/login" method="POST"><input type="text" name="username" placeholder="Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Acessar Sistema</button></form></div></div>`);
+        if (req.query.tela === 'cadastro') {
+            return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #10b981;"><h2>📝 CRIAR CADASTRO</h2><form action="/cadastrar" method="POST"><input type="text" name="username" placeholder="Escolha seu Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Crie uma Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Registrar e Entrar</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/" style="color:#f59e0b; text-decoration:none;">Já tem conta? Faça seu Login</a></p></div></div>`);
+        } else {
+            return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #f59e0b;"><h2>🏆 ENTRAR NO BOLÃO</h2><form action="/login" method="POST"><input type="text" name="username" placeholder="Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Acessar Sistema</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/?tela=cadastro" style="color:#10b981; text-decoration:none; font-weight:bold;">Não tem conta? Cadastre-se aqui</a></p></div></div>`);
+        }
     }
 
     const u = req.session.user; 
     const dId = req.session.dispId || "GLOBAL";
     const faseAtiva = req.session.faseAtiva || "r1";
-    const dispAtual = disputasBase.find(d => d.id === dId) || disputasBase[0];
+    const dispAtual = DB.disputas.find(d => d.id === dId) || DB.disputas[0];
+
+    let htmlLinkConvite = '';
+    if (dispAtual.id !== 'GLOBAL') {
+        htmlLinkConvite = `
+            <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:14px; color:#9ca3af;">✉️ Link de convite para este grupo:</span>
+                <input type="text" value="https://${req.get('host')}/?convite=${dispAtual.id}" readonly onclick="this.select(); alert('Link copiado!');" style="width:340px; color:#f59e0b; text-align:center; font-weight:bold; background:#1f2937; border:1px solid #374151; padding:4px; border-radius:4px;">
+            </div>`;
+    }
 
     let htmlTopo = `
     <div style="background:#111827; padding:20px; border-radius:12px; border:1px solid #374151; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
         <div><h1 style="margin:0; font-size:20px;">🏆 COPA 2026 — BOLÃO</h1><p style="margin:2px 0 0 0; color:#9ca3af; font-size:13px;">Jogador: <strong style="color:#f59e0b;">${u.toUpperCase()}</strong> | <a href="/logout" style="color:#ef4444; text-decoration:none;">[Sair]</a></p></div>
         <div style="display:flex; gap:10px; align-items:center;">
-            <form action="/disputa/selecionar" method="POST" style="margin:0;"><select name="disputaId" onchange="this.form.submit()" style="padding:6px; font-weight:bold; color:#f59e0b; background:#1f2937; border:1px solid #374151; border-radius:6px;">${disputasBase.map(d => `<option value="${d.id}" ${dispAtual.id===d.id?'selected':''}>${d.nome}</option>`).join('')}</select></form>
+            <form action="/grupo/entrar" method="POST" style="margin:0;"><input type="text" name="codigo" placeholder="Código Manual" style="padding:5px; width:110px; font-size:12px; background:#1f2937; color:#fff; border:1px solid #374151; border-radius:6px;"><button type="submit" class="btn" style="padding:5px 10px; font-size:12px;">Entrar</button></form>
+            <form action="/disputa/selecionar" method="POST" style="margin:0;"><select name="disputaId" onchange="this.form.submit()" style="padding:6px; font-weight:bold; color:#f59e0b; background:#1f2937; border:1px solid #374151; border-radius:6px;">${DB.disputas.map(d => `<option value="${d.id}" ${dispAtual.id===d.id?'selected':''}>${d.nome}</option>`).join('')}</select></form>
         </div>
     </div>`;
 
@@ -206,32 +245,29 @@ app.get('/', (req, res) => {
     <div style="background:#111827; border:1px solid #1f2937; padding:20px; border-radius:12px; margin-bottom:20px;">
         <h3 style="color:#f59e0b; margin:0 0 15px 0; font-size:14px; text-transform:uppercase;">➕ Criar Novo Grupo de Disputa</h3>
         <form action="/grupo/criar" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; margin:0;">
-            <input type="text" name="nome" placeholder="Nome do Grupo" required style="flex:1; min-width:200px;">
+            <input type="text" name="nome" placeholder="Nome do Grupo (Ex: Galera da Firma)" required style="flex:1; min-width:200px;">
             <select name="modo" style="color:#f59e0b; font-weight:bold; background:#1f2937; border:1px solid #374151; border-radius:6px; padding:8px;">
                 <option value="groups">Modo: Apenas Grupos</option>
                 <option value="rounds">Modo: Apenas Rodadas</option>
-                <option value="ambos">Modo: Ambos (Grupos e Rodadas)</option>
+                <option value="ambos">Modo: Ambos</option>
             </select>
             <button type="submit" class="btn">Criar Grupo Privado</button>
         </form>
     </div>`;
 
-    // Filtro de Fase (Menu de Navegação das Rodadas)
-    let htmlSeletorFases = '';
-    if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
-        htmlSeletorFases = `
-        <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
-            <span style="font-size:14px; font-weight:bold; color:#9ca3af;">📅 Escolha a Fase para Palpitar:</span>
-            <form action="/fase/selecionar" method="POST" style="margin:0; display:inline-block;">
-                <select name="faseId" onchange="this.form.submit()" style="color:#10b981; font-weight:bold; background:#1f2937; border:1px solid #374151; border-radius:6px; padding:8px; font-size:14px;">
-                    ${Object.keys(NOMES_FASES).map(fId => `<option value="${fId}" ${faseAtiva===fId?'selected':''}>${NOMES_FASES[fId]}</option>`).join('')}
-                </select>
-            </form>
-        </div>`;
-    }
+    let htmlSeletorFases = `
+    <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+        <span style="font-size:14px; font-weight:bold; color:#9ca3af;">📅 Mudar Rodada / Fase do Mata-Mata:</span>
+        <form action="/fase/selecionar" method="POST" style="margin:0; display:flex; gap:10px;">
+            <select name="faseId" style="color:#10b981; font-weight:bold; background:#1f2937; border:1px solid #374151; border-radius:6px; padding:8px;">
+                ${Object.keys(NOMES_FASES).map(fId => `<option value="${fId}" ${faseAtiva===fId?'selected':''}>${NOMES_FASES[fId]}</option>`).join('')}
+            </select>
+            <button type="submit" class="btn" style="padding:5px 12px;">Visualizar</button>
+        </form>
+    </div>`;
 
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
-    const competidores = membrosDisputas[dispAtual.id] || [u];
+    const competidores = DB.membros[dispAtual.id] || [u];
     competidores.forEach((p, index) => {
         let pontos = 0;
         if (dispAtual.id === "GLOBAL") { pontos = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0); }
@@ -239,11 +275,10 @@ app.get('/', (req, res) => {
     });
     htmlRanking += `</table>`;
 
-    // Renderização da Fase de Grupos Estática (Classificados diretos)
     let htmlG = '';
     if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
         Object.keys(GRUPOS).forEach(g => {
-            const pal = (pClassif[dispAtual.id] && pClassif[dispAtual.id][u] && pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
+            const pal = (DB.pClassif[dispAtual.id] && DB.pClassif[dispAtual.id][u] && DB.pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
             htmlG += `<div class="card-g" style="margin-bottom:15px;">
                 <h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3>
                 ${GRUPOS[g].map(t => `<div style="margin:4px 0; font-size:14px;">${badge(t)} ${t}</div>`).join('')}
@@ -257,14 +292,11 @@ app.get('/', (req, res) => {
         });
     }
 
-    // Renderização Dinâmica por Rodada Selecionada
     let htmlP = '';
     if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
-        // Filtra apenas os jogos correspondentes à fase que o usuário selecionou no menu dropdown
         const jogosFase = PARTIDAS.filter(p => p.fase === faseAtiva);
-        
         jogosFase.forEach(p => {
-            const pal = (pPlacar[dispAtual.id] && pPlacar[dispAtual.id][u] && pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
+            const pal = (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][u] && DB.pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
             htmlP += `<div class="card-p">
                 <form action="/palpite/placar" method="POST" style="display:flex; width:100%; justify-content:space-between; align-items:center; margin:0;">
                     <input type="hidden" name="partidaId" value="${p.id}">
@@ -288,4 +320,4 @@ app.get('/', (req, res) => {
     </div>`);
 });
 
-app.listen(PORT, () => console.log('Servidor ativo com sistema de fases completo rodando!'));
+app.listen(PORT, () => console.log('Servidor ativo e dados blindados contra reinicializações!'));
