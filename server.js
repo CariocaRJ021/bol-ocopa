@@ -14,7 +14,6 @@ const disputasBase = [
     { id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }
 ];
 
-// Estrutura para rastrear quais usuários pertencem a quais disputas
 const membrosDisputas = {
     "GLOBAL": ["thiago", "sofia", "admin"]
 };
@@ -22,25 +21,80 @@ const membrosDisputas = {
 const pClassif = {}; 
 const pPlacar = {};
 
-// 2. DICIONÁRIO DE BANDEIRAS
+// 2. DICIONÁRIO COMPLETO DE BANDEIRAS DA COPA 2026 (48 Seleções)
 const PAISES = { 
+    // Grupo A ao C
     "México": "mx", "África do Sul": "za", "Coreia do Sul": "kr", "Chéquia": "cz",
-    "Canadá": "ca", "Bósnia e Herzegovina": "ba", "Catar": "qa", "Suíça": "ch",
-    "Brasil": "br", "Marrocos": "ma", "Haiti": "ht", "Escócia": "gb-sct"
+    "Canadá": "ca", "Básnia e Herzegovina": "ba", "Catar": "qa", "Suíça": "ch",
+    "Brasil": "br", "Marrocos": "ma", "Haiti": "ht", "Escócia": "gb-sct",
+    // Grupo D ao F
+    "França": "fr", "Espanha": "es", "Tunísia": "tn", "Nova Zelândia": "nz",
+    "Alemanha": "de", "Japão": "jp", "Camarões": "cm", "Honduras": "hn",
+    "Argentina": "ar", "Irã": "ir", "Costa Rica": "cr", "Ucrânia": "ua",
+    // Grupo G ao I
+    "Inglaterra": "gb-eng", "Equador": "ec", "Nigéria": "ng", "Uzbequistão": "uz",
+    "Bélgica": "be", "Austrália": "au", "Panamá": "pa", "Jamaica": "jm",
+    "Itália": "it", "Uruguai": "uy", "Gana": "gh", "Omã": "om",
+    // Grupo J ao L
+    "Portugal": "pt", "Croácia": "hr", "Argélia": "dz", "Iraque": "iq",
+    "Holanda": "nl", "Chile": "cl", "Mali": "ml", "Zâmbia": "zm",
+    "Estados Unidos": "us", "Colômbia": "co", "Áustria": "at", "Peru": "pe"
 };
 
-// 3. ESTRUTURA DOS GRUPOS
+// 3. ESTRUTURA DOS 12 GRUPOS COMPLETOS (A até L)
 const GRUPOS = { 
     A: ["México", "África do Sul", "Coreia do Sul", "Chéquia"], 
-    B: ["Canadá", "Bósnia e Herzegovina", "Catar", "Suíça"], 
-    C: ["Brasil", "Marrocos", "Haiti", "Escócia"] 
+    B: ["Canadá", "Básnia e Herzegovina", "Catar", "Suíça"], 
+    C: ["Brasil", "Marrocos", "Haiti", "Escócia"],
+    D: ["França", "Espanha", "Tunísia", "Nova Zelândia"],
+    E: ["Alemanha", "Japão", "Camarões", "Honduras"],
+    F: ["Argentina", "Irã", "Costa Rica", "Ucrânia"],
+    G: ["Inglaterra", "Equador", "Nigéria", "Uzbequistão"],
+    H: ["Bélgica", "Austrália", "Panamá", "Jamaica"],
+    I: ["Itália", "Uruguai", "Gana", "Omã"],
+    J: ["Portugal", "Croácia", "Argélia", "Iraque"],
+    K: ["Holanda", "Chile", "Mali", "Zâmbia"],
+    L: ["Estados Unidos", "Colômbia", "Áustria", "Peru"]
 };
 
-// 4. JOGOS DA 1ª RODADA
+// 4. MAPEAMENTO DOS 24 JOGOS DA 1ª RODADA (2 jogos por grupo)
 const PARTIDAS = [
+    // Grupo A
     { id: 1, tA: "México", tB: "África do Sul", grupo: "A" },
-    { id: 2, tA: "Canadá", tB: "Bósnia e Herzegovina", grupo: "B" },
-    { id: 3, tA: "Brasil", tB: "Marrocos", grupo: "C" }
+    { id: 2, tA: "Coreia do Sul", tB: "Chéquia", grupo: "A" },
+    // Grupo B
+    { id: 3, tA: "Canadá", tB: "Básnia e Herzegovina", grupo: "B" },
+    { id: 4, tA: "Catar", tB: "Suíça", grupo: "B" },
+    // Grupo C
+    { id: 5, tA: "Brasil", tB: "Marrocos", grupo: "C" },
+    { id: 6, tA: "Haiti", tB: "Escócia", grupo: "C" },
+    // Grupo D
+    { id: 7, tA: "França", tB: "Espanha", grupo: "D" },
+    { id: 8, tA: "Tunísia", tB: "Nova Zelândia", grupo: "D" },
+    // Grupo E
+    { id: 9, tA: "Alemanha", tB: "Japão", grupo: "E" },
+    { id: 10, tA: "Camarões", tB: "Honduras", grupo: "E" },
+    // Grupo F
+    { id: 11, tA: "Argentina", tB: "Irã", grupo: "F" },
+    { id: 12, tA: "Costa Rica", tB: "Ucrânia", grupo: "F" },
+    // Grupo G
+    { id: 13, tA: "Inglaterra", tB: "Equador", grupo: "G" },
+    { id: 14, tA: "Nigéria", tB: "Uzbequistão", grupo: "G" },
+    // Grupo H
+    { id: 15, tA: "Bélgica", tB: "Austrália", grupo: "H" },
+    { id: 16, tA: "Panamá", tB: "Jamaica", grupo: "H" },
+    // Grupo I
+    { id: 17, tA: "Itália", tB: "Uruguai", grupo: "I" },
+    { id: 18, tA: "Gana", tB: "Omã", grupo: "I" },
+    // Grupo J
+    { id: 19, tA: "Portugal", tB: "Croácia", grupo: "J" },
+    { id: 20, tA: "Argélia", tB: "Iraque", grupo: "J" },
+    // Grupo K
+    { id: 21, tA: "Holanda", tB: "Chile", grupo: "K" },
+    { id: 22, tA: "Mali", tB: "Zâmbia", grupo: "K" },
+    // Grupo L
+    { id: 23, tA: "Estados Unidos", tB: "Colômbia", grupo: "L" },
+    { id: 24, tA: "Áustria", tB: "Peru", grupo: "L" }
 ];
 
 function badge(time) {
@@ -48,14 +102,9 @@ function badge(time) {
     return c ? `<img src="https://flagcdn.com/w40/${c}.png" style="width:22px; border-radius:4px; vertical-align:middle; margin:0 6px;">` : '';
 }
 
-// Vincular usuário ao grupo de forma dinâmica
 function vincularAoGrupo(disputaId, usuario) {
-    if (!membrosDisputas[disputaId]) {
-        membrosDisputas[disputaId] = [];
-    }
-    if (!membrosDisputas[disputaId].includes(usuario)) {
-        membrosDisputas[disputaId].push(usuario);
-    }
+    if (!membrosDisputas[disputaId]) { membrosDisputas[disputaId] = []; }
+    if (!membrosDisputas[disputaId].includes(usuario)) { membrosDisputas[disputaId].push(usuario); }
 }
 
 // 5. ROTAS DE AUTENTICAÇÃO
@@ -74,36 +123,23 @@ app.post('/login', (req, res) => {
 app.post('/cadastrar', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     const pass = req.body.password;
-
-    if (!user || !pass) {
-        return res.send("<h3>Erro! Preencha todos os campos. <a href='/?tela=cadastro'>Voltar</a></h3>");
-    }
-    if (USUARIOS_CADASTRADOS[user]) {
-        return res.send("<h3>Erro! Este usuário já existe. <a href='/?tela=cadastro'>Voltar</a></h3>");
-    }
+    if (!user || !pass) { return res.send("<h3>Erro! Preencha todos os campos. <a href='/?tela=cadastro'>Voltar</a></h3>"); }
+    if (USUARIOS_CADASTRADOS[user]) { return res.send("<h3>Erro! Este usuário já existe. <a href='/?tela=cadastro'>Voltar</a></h3>"); }
 
     USUARIOS_CADASTRADOS[user] = pass;
     req.session.user = user;
     const dId = req.session.convitePendente || "GLOBAL";
     req.session.dispId = dId;
-    
     vincularAoGrupo("GLOBAL", user);
     vincularAoGrupo(dId, user);
-    
     res.redirect('/');
 });
 
-// 6. ROTAS DE DISPUTAS E PALPITES
+// 6. ROTAS DE DISPUTAS AND PALPITES
 app.post('/grupo/criar', (req, res) => {
     const codigoUnico = 'COPA-' + Math.random().toString(36).substr(2, 4).toUpperCase();
     const modoSelecionado = req.body.modo || "ambos";
-    
-    disputasBase.push({ 
-        id: codigoUnico, 
-        nome: `${req.body.nome} (${modoSelecionado.toUpperCase()})`, 
-        modo: modoSelecionado 
-    });
-    
+    disputasBase.push({ id: codigoUnico, nome: `${req.body.nome}`, modo: modoSelecionado });
     req.session.dispId = codigoUnico;
     vincularAoGrupo(codigoUnico, req.session.user);
     res.redirect('/');
@@ -127,38 +163,29 @@ app.post('/disputa/selecionar', (req, res) => {
 
 app.post('/palpite/grupo', (req, res) => {
     const { grupo, primeiro, segundo } = req.body; 
-    const dId = req.session.dispId || "GLOBAL"; 
-    const u = req.session.user;
-    if (!pClassif[dId]) pClassif[dId] = {}; 
-    if (!pClassif[dId][u]) pClassif[dId][u] = {};
-    pClassif[dId][u][grupo] = { primeiro, segundo }; 
+    const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
+    if (!pClassif[dId]) pClassif[dId] = {}; if (!pClassif[dId][u]) pClassif[dId][u] = {};
+    pClassif[dId][u][grupo] = { primeiro, segundo };
     vincularAoGrupo(dId, u);
     res.redirect('/');
 });
 
 app.post('/palpite/placar', (req, res) => {
     const { partidaId, golA, golB } = req.body; 
-    const dId = req.session.dispId || "GLOBAL"; 
-    const u = req.session.user;
-    if (!pPlacar[dId]) pPlacar[dId] = {}; 
-    if (!pPlacar[dId][u]) pPlacar[dId][u] = {};
-    pPlacar[dId][u][partidaId] = { golA, golB }; 
+    const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
+    if (!pPlacar[dId]) pPlacar[dId] = {}; if (!pPlacar[dId][u]) pPlacar[dId][u] = {};
+    pPlacar[dId][u][partidaId] = { golA, golB };
     vincularAoGrupo(dId, u);
     res.redirect('/');
 });
 
-app.get('/logout', (req, res) => { 
-    req.session.destroy(); 
-    res.redirect('/'); 
-});
+app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 // 7. INTERFACE VISUAL
 app.get('/', (req, res) => {
     const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
 
-    if (req.query.convite) {
-        req.session.convitePendente = req.query.convite.trim().toUpperCase();
-    }
+    if (req.query.convite) { req.session.convitePendente = req.query.convite.trim().toUpperCase(); }
 
     if (!req.session.user) {
         if (req.query.tela === 'cadastro') {
@@ -172,7 +199,6 @@ app.get('/', (req, res) => {
     const dId = req.session.dispId || "GLOBAL";
     const dispAtual = disputasBase.find(d => d.id === dId) || disputasBase[0];
 
-    // Link de convite dinâmico
     let htmlLinkConvite = '';
     if (dispAtual.id !== 'GLOBAL') {
         const linkCompleto = `https://meu-bolao-2026.onrender.com/?convite=${dispAtual.id}`;
@@ -192,7 +218,6 @@ app.get('/', (req, res) => {
         </div>
     </div>`;
 
-    // Formulário Corrigido com as 3 opções exclusivas de modo
     let htmlCriadorGrupo = `
     <div style="background:#111827; border:1px solid #1f2937; padding:20px; border-radius:12px; margin-bottom:20px;">
         <h3 style="color:#f59e0b; margin:0 0 15px 0; font-size:14px; text-transform:uppercase;">➕ Criar Novo Grupo de Disputa</h3>
@@ -207,28 +232,21 @@ app.get('/', (req, res) => {
         </form>
     </div>`;
 
-    // Tabela Dinâmica: Sem fantasmas em grupos privados
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
-    
-    // Pega a lista de quem realmente pertence a este grupo
     const competidores = membrosDisputas[dispAtual.id] || [u];
     
     competidores.forEach((p, index) => {
-        // Pontuação fixa apenas para exibição estática no bolão global fictício
         let pontos = 0;
-        if (dispAtual.id === "GLOBAL") {
-            pontos = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0);
-        }
+        if (dispAtual.id === "GLOBAL") { pontos = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0); }
         htmlRanking += `<tr><td><strong>${index + 1}º</strong></td><td>${p.toUpperCase()}</td><td style="color:#10b981; font-weight:bold;">${pontos} pts</td></tr>`;
     });
     htmlRanking += `</table>`;
 
-    // Lógica Dinâmica de exibição de blocos baseado no modo do grupo ativo
     let htmlG = '';
     if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
         Object.keys(GRUPOS).forEach(g => {
             const pal = (pClassif[dispAtual.id] && pClassif[dispAtual.id][u] && pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
-            htmlG += `<div class="card-g">
+            htmlG += `<div class="card-g" style="margin-bottom:15px;">
                 <h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3>
                 ${GRUPOS[g].map(t => `<div style="margin:4px 0; font-size:14px;">${badge(t)} ${t}</div>`).join('')}
                 <form action="/palpite/grupo" method="POST" style="margin-top:15px;">
@@ -263,9 +281,9 @@ app.get('/', (req, res) => {
         ${htmlCriadorGrupo}
         ${htmlLinkConvite}
         ${htmlRanking}
-        ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
-        ${htmlP ? `<h2>2. Placares da Rodada</h2><div>${htmlP}</div>` : ''}
+        ${htmlG ? `<h2>1. Classificados da Fase de Grupos (A ao L)</h2><div class="grid">${htmlG}</div>` : ''}
+        ${htmlP ? `<h2>2. Placares da Rodada (24 Jogos Completos)</h2><div>${htmlP}</div>` : ''}
     </div>`);
 });
 
-app.listen(PORT, () => console.log('Servidor ativo e totalmente corrigido!'));
+app.listen(PORT, () => console.log('Servidor ativo, com todos os grupos e jogos da primeira rodada!'));
