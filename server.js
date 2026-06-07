@@ -99,9 +99,9 @@ Object.keys(GRUPOS).forEach(g => {
 for (let i = 1; i <= 16; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `16avos - Jg ${i}`, fase: "16avos" }); }
 for (let i = 1; i <= 8; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Oitavas - Jg ${i}`, fase: "oitavas" }); }
 for (let i = 1; i <= 4; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Quartas - Jg ${i}`, fase: "quartas" }); }
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 1", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 2", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Grande Final", fase: "final" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Semifinal 1", fase: "semis" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Semifinal 2", fase: "semis" });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", group: "Grande Final", fase: "final" });
 
 const NOMES_FASES = {
     "r1": "Fase de Grupos - 1ª Rodada", "r2": "Fase de Grupos - 2ª Rodada", "r3": "Fase de Grupos - 3ª Rodada",
@@ -277,7 +277,6 @@ app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 // --- ROTA INTERFACE PRINCIPAL ---
 app.get('/', (req, res) => {
-    // CSS COMPLETAMENTE REDESENHADO COM FOCO EM RESPONSIVIDADE (MOBILE & DESKTOP)
     const css = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -289,11 +288,9 @@ app.get('/', (req, res) => {
         .btn:hover{opacity:0.9;} 
         select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:10px;border-radius:6px;box-sizing:border-box;} 
         
-        /* Sistema de Grids Flexíveis */
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:15px;justify-content:center;} 
         .card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;border-top:4px solid #10b981;box-sizing:border-box;} 
         
-        /* Cartão de Placar Responsivo */
         .card-p{background:#111827;border:1px solid #1f2937;padding:15px;margin:10px 0;border-radius:12px;border-left:5px solid #f59e0b;}
         .form-placar{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;width:100%;flex-wrap:wrap;}
         .info-partida{font-size:11px;color:#10b981;font-weight:bold;min-width:90px;}
@@ -303,7 +300,6 @@ app.get('/', (req, res) => {
         .placar-inputs{display:flex;align-items:center;gap:6px;}
         .placar-inputs input{width:45px;text-align:center;padding:6px;font-weight:bold;font-size:16px;}
         
-        /* Elementos Gerais de Estrutura */
         .flex-wrap-header{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;}
         .tabela-wrapper{width:100%;overflow-x:auto;background:#111827;border-radius:8px;}
         table{width:100%;border-collapse:collapse;min-width:400px;} 
@@ -313,7 +309,6 @@ app.get('/', (req, res) => {
         .regras-item{margin:6px 0;font-size:13px;color:#9ca3af;} 
         .admin-box{background:#1e1b4b;border:2px dashed #6366f1;padding:15px;border-radius:12px;margin-top:30px;}
 
-        /* MEDIA QUERIES PARA CELULARES PEQUENOS */
         @media(max-width:600px){
             body{padding:8px;}
             .form-placar{flex-direction:column;align-items:stretch;text-align:center;}
@@ -378,7 +373,7 @@ app.get('/', (req, res) => {
     let htmlSeletorFases = '';
     if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
         htmlSeletorFases = `
-        <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px;" class="flex-wrap-header">
+        <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-top:25px; margin-bottom:10px; border-radius:12px;" class="flex-wrap-header">
             <span style="font-size:14px; font-weight:bold; color:#9ca3af;">📅 Alternar Rodada:</span>
             <form action="/fase/selecionar" method="POST" style="margin:0; display:flex; gap:10px; width:100%; max-width:400px;">
                 <select name="faseId" style="color:#10b981; font-weight:bold; flex:1;">
@@ -527,14 +522,15 @@ app.get('/', (req, res) => {
         ${SCRIPT_DINAMICO}`;
     }
 
+    // ALTERAÇÃO DO FLUXO VISUAL AQUI: Seletor de fases agora renderiza grudado nos placares da rodada
     res.send(`${css}<div class="container">
         ${htmlTopo}
         ${htmlCriadorGrupo}
         ${htmlLinkConvite}
-        ${htmlSeletorFases}
         ${htmlRanking}
         ${htmlRegrasModo}
         ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
+        ${htmlSeletorFases}
         ${htmlP ? `<h2>2. Placares da Rodada</h2><div>${htmlP}</div>` : ''}
         ${htmlAdmin}
     </div>`);
