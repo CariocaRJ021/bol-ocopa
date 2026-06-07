@@ -1,43 +1,50 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
+const MongoStore = require('connect-mongo');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'dados.json');
 
+// --- CONEXÃO COM O BANCO DE DADOS (MONGODB) ---
+// Usará a variável de ambiente do Render ou um fallback local para testes
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/bolaoCopa";
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("🔥 Conectado com sucesso ao MongoDB Atlas!"))
+  .catch(err => console.error("❌ Erro ao conectar ao MongoDB:", err));
+
+// --- CONFIGURAÇÃO DE SESSÕES PERSISTENTES ---
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(session({ secret: 'copa2026-key', resave: false, saveUninitialized: true }));
+app.use(session({ 
+    secret: 'copa2026-key', 
+    resave: false, 
+    saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: MONGO_URI }), // Salva os logins no banco!
+    cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // Mantém logado por 7 dias
+}));
 
-// --- PERSISTÊNCIA EM ARQUIVO LOCAL ---
-let DB = {
-    usuarios: { "admin": "1234", "thiago": "1234", "sofia": "1234" },
-    disputas: [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }],
-    membros: { "GLOBAL": ["thiago", "sofia", "admin"] },
-    pClassif: {},
-    pPlacar: {}
-};
+// --- DEFINIÇÃO DOS SCHEMAS (ESTRUTURA DO BANCO) ---
+const EstadoSchema = new mongoose.Schema({
+    idUnico: { type: String, default: "SISTEMA_GLOBAL" },
+    usuarios: { type: Map, of: String, default: { "admin": "1234", "thiago": "1234", "sofia": "1234" } },
+    disputas: { type: Array, default: [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }] },
+    membros: { type: Map, of: [String], default: { "GLOBAL": ["thiago", "sofia", "admin"] } },
+    pClassif: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
+    pPlacar: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} }
+}, { minimize: false });
 
-function carregarDados() {
-    if (fs.existsSync(DATA_FILE)) {
-        try {
-            const conteudo = fs.readFileSync(DATA_FILE, 'utf8');
-            DB = JSON.parse(conteudo);
-        } catch (e) {
-            console.error("Erro ao ler arquivo de dados, usando estrutura inicial.");
-        }
+const EstadoBoletao = mongoose.model('EstadoBoletao', EstadoSchema);
+
+// Função auxiliar para garantir que a estrutura exista e buscar os dados
+async function obterDB() {
+    let dados = await EstadoBoletao.findOne({ idUnico: "SISTEMA_GLOBAL" });
+    if (!dados) {
+        dados = await EstadoBoletao.create({});
     }
+    return dados;
 }
-function salvarDados() {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(DB, null, 2), 'utf8');
-    } catch (e) {
-        console.error("Erro ao salvar dados:", e);
-    }
-}
-carregarDados();
 
 // --- DICIONÁRIO DE BANDEIRAS ---
 const PAISES = { 
@@ -76,28 +83,22 @@ const GRUPOS = {
 const PARTIDAS = [];
 let idPartida = 1;
 
-// Rodada 1
 Object.keys(GRUPOS).forEach(g => {
     const [t1, t2, t3, t4] = GRUPOS[g];
     PARTIDAS.push({ id: idPartida++, tA: t1, tB: t2, grupo: `Grupo ${g}`, fase: "r1" });
     PARTIDAS.push({ id: idPartida++, tA: t3, tB: t4, grupo: `Grupo ${g}`, fase: "r1" });
 });
-
-// Rodada 2
 Object.keys(GRUPOS).forEach(g => {
     const [t1, t2, t3, t4] = GRUPOS[g];
     PARTIDAS.push({ id: idPartida++, tA: t1, tB: t3, grupo: `Grupo ${g}`, fase: "r2" });
     PARTIDAS.push({ id: idPartida++, tA: t2, tB: t4, grupo: `Grupo ${g}`, fase: "r2" });
 });
-
-// Rodada 3
 Object.keys(GRUPOS).forEach(g => {
     const [t1, t2, t3, t4] = GRUPOS[g];
     PARTIDAS.push({ id: idPartida++, tA: t4, tB: t1, grupo: `Grupo ${g}`, fase: "r3" });
     PARTIDAS.push({ id: idPartida++, tA: t2, tB: t3, grupo: `Grupo ${g}`, fase: "r3" });
 });
 
-// Mata-Mata
 for (let i = 1; i <= 16; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `16avos - Jg ${i}`, fase: "16avos" }); }
 for (let i = 1; i <= 8; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Oitavas - Jg ${i}`, fase: "oitavas" }); }
 for (let i = 1; i <= 4; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Quartas - Jg ${i}`, fase: "quartas" }); }
@@ -116,65 +117,81 @@ function badge(time) {
     return `<img src="https://flagcdn.com/w40/${c}.png" style="width:22px; border-radius:4px; vertical-align:middle; margin:0 6px;">`;
 }
 
-function vincularAoGrupo(disputaId, usuario) {
-    if (!DB.membros[disputaId]) { DB.membros[disputaId] = []; }
-    if (!DB.membros[disputaId].includes(usuario)) { DB.membros[disputaId].push(usuario); }
-    salvarDados();
+async function vincularAoGrupo(dadosDB, disputaId, usuario) {
+    let membrosGrupo = dadosDB.membros.get(disputaId) || [];
+    if (!membrosGrupo.includes(usuario)) {
+        membrosGrupo.push(usuario);
+        dadosDB.membros.set(disputaId, membrosGrupo);
+        dadosDB.markModified('membros');
+        await dadosDB.save();
+    }
 }
 
 // --- ROTAS DE AUTENTICAÇÃO ---
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     const pass = req.body.password;
-    if (DB.usuarios[user] && DB.usuarios[user] === pass) {
+    const db = await obterDB();
+    
+    if (db.usuarios.get(user) && db.usuarios.get(user) === pass) {
         req.session.user = user;
         req.session.dispId = req.session.convitePendente || "GLOBAL";
         req.session.faseAtiva = "r1";
-        vincularAoGrupo(req.session.dispId, user);
+        await vincularAoGrupo(db, req.session.dispId, user);
         return res.redirect('/');
     }
     res.send("<h3>Erro! Usuário ou senha incorretos. <a href='/'>Voltar</a></h3>");
 });
 
-app.post('/cadastrar', (req, res) => {
+app.post('/cadastrar', async (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     const pass = req.body.password;
     if (!user || !pass) return res.send("<h3>Preencha tudo! <a href='/?tela=cadastro'>Voltar</a></h3>");
-    if (DB.usuarios[user]) return res.send("<h3>Usuário já existe! <a href='/?tela=cadastro'>Voltar</a></h3>");
+    
+    const db = await obterDB();
+    if (db.usuarios.get(user)) return res.send("<h3>Usuário já existe! <a href='/?tela=cadastro'>Voltar</a></h3>");
 
-    DB.usuarios[user] = pass;
+    db.usuarios.set(user, pass);
+    db.markModified('usuarios');
+    await db.save();
+
     req.session.user = user;
     req.session.dispId = req.session.convitePendente || "GLOBAL";
     req.session.faseAtiva = "r1";
-    vincularAoGrupo("GLOBAL", user);
-    vincularAoGrupo(req.session.dispId, user);
+    
+    await vincularAoGrupo(db, "GLOBAL", user);
+    await vincularAoGrupo(db, req.session.dispId, user);
+    
     res.redirect('/');
 });
 
-// --- SEGURANÇA E ALTERNÂNCIA DE ROTAS ---
 app.post('/fase/selecionar', (req, res) => {
     req.session.faseAtiva = req.body.faseId;
     res.redirect('/');
 });
-app.get('/fase/selecionar', (req, res) => {
-    res.redirect('/');
-});
+app.get('/fase/selecionar', (req, res) => { res.redirect('/'); });
 
-app.post('/grupo/criar', (req, res) => {
+app.post('/grupo/criar', async (req, res) => {
     const codigoUnico = 'COPA-' + Math.random().toString(36).substr(2, 4).toUpperCase();
     const modoSelecionado = req.body.modo || "ambos";
-    DB.disputas.push({ id: codigoUnico, nome: req.body.nome, modo: modoSelecionado });
+    
+    const db = await obterDB();
+    db.disputas.push({ id: codigoUnico, nome: req.body.nome, modo: modoSelecionado });
+    db.markModified('disputas');
+    await db.save();
+
     req.session.dispId = codigoUnico;
-    vincularAoGrupo(codigoUnico, req.session.user);
+    await vincularAoGrupo(db, codigoUnico, req.session.user);
     res.redirect('/');
 });
 
-app.post('/grupo/entrar', (req, res) => {
+app.post('/grupo/entrar', async (req, res) => {
     const cod = req.body.codigo.trim().toUpperCase();
-    const grupoEncontrado = DB.disputas.find(g => g.id === cod);
+    const db = await obterDB();
+    const grupoEncontrado = db.disputas.find(g => g.id === cod);
     if (grupoEncontrado) { 
         req.session.dispId = grupoEncontrado.id; 
-        vincularAoGrupo(grupoEncontrado.id, req.session.user);
+        await vincularAoGrupo(db, grupoEncontrado.id, req.session.user);
     }
     res.redirect('/');
 });
@@ -184,30 +201,46 @@ app.post('/disputa/selecionar', (req, res) => {
     res.redirect('/'); 
 });
 
-app.post('/palpite/grupo', (req, res) => {
+app.post('/palpite/grupo', async (req, res) => {
     const { grupo, primeiro, segundo } = req.body; 
-    const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
-    if (!DB.pClassif[dId]) DB.pClassif[dId] = {}; 
-    if (!DB.pClassif[dId][u]) DB.pClassif[dId][u] = {};
-    DB.pClassif[dId][u][grupo] = { primeiro, segundo };
-    salvarDados();
+    const dId = req.session.dispId || "GLOBAL"; 
+    const u = req.session.user;
+    
+    const db = await obterDB();
+    if (!db.pClassif.get(dId)) db.pClassif.set(dId, {});
+    
+    let palpiteGrupo = db.pClassif.get(dId);
+    if (!palpiteGrupo[u]) palpiteGrupo[u] = {};
+    palpiteGrupo[u][grupo] = { primeiro, segundo };
+    
+    db.pClassif.set(dId, palpiteGrupo);
+    db.markModified('pClassif');
+    await db.save();
     res.redirect('/');
 });
 
-app.post('/palpite/placar', (req, res) => {
+app.post('/palpite/placar', async (req, res) => {
     const { partidaId, golA, golB } = req.body; 
-    const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
-    if (!DB.pPlacar[dId]) DB.pPlacar[dId] = {}; 
-    if (!DB.pPlacar[dId][u]) DB.pPlacar[dId][u] = {};
-    DB.pPlacar[dId][u][partidaId] = { golA, golB };
-    salvarDados();
+    const dId = req.session.dispId || "GLOBAL"; 
+    const u = req.session.user;
+    
+    const db = await obterDB();
+    if (!db.pPlacar.get(dId)) db.pPlacar.set(dId, {});
+    
+    let palpitePlacar = db.pPlacar.get(dId);
+    if (!palpitePlacar[u]) palpitePlacar[u] = {};
+    palpitePlacar[u][partidaId] = { golA, golB };
+    
+    db.pPlacar.set(dId, palpitePlacar);
+    db.markModified('pPlacar');
+    await db.save();
     res.redirect('/');
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 // --- ROTA INTERFACE PRINCIPAL ---
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
     const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;} .container{max-width:1100px;margin:auto;} h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;} .btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;} .grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;} .card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;} .card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;} .row{display:flex;align-items:center;gap:10px;width:38%;} table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;} th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;} th{background:#10b981;color:#fff;} .regras-box{background:#111827; border:1px solid #1f2937; padding:15px 20px; border-radius:12px; margin-top:15px; border-left:5px solid #10b981;} .regras-item{margin:6px 0; font-size:13px; color:#9ca3af;} .regras-item strong{color:#f3f4f6;}</style>`;
 
     if (req.query.convite) { req.session.convitePendente = req.query.convite.trim().toUpperCase(); }
@@ -223,7 +256,9 @@ app.get('/', (req, res) => {
     const u = req.session.user; 
     const dId = req.session.dispId || "GLOBAL";
     const faseAtiva = req.session.faseAtiva || "r1";
-    const dispAtual = DB.disputas.find(d => d.id === dId) || DB.disputas[0];
+    
+    const db = await obterDB();
+    const dispAtual = db.disputas.find(d => d.id === dId) || db.disputas[0];
 
     let htmlLinkConvite = '';
     if (dispAtual.id !== 'GLOBAL') {
@@ -239,7 +274,7 @@ app.get('/', (req, res) => {
         <div><h1 style="margin:0; font-size:20px;">🏆 COPA 2026 — BOLÃO</h1><p style="margin:2px 0 0 0; color:#9ca3af; font-size:13px;">Jogador: <strong style="color:#f59e0b;">${u.toUpperCase()}</strong> | <a href="/logout" style="color:#ef4444; text-decoration:none;">[Sair]</a></p></div>
         <div style="display:flex; gap:10px; align-items:center;">
             <form action="/grupo/entrar" method="POST" style="margin:0;"><input type="text" name="codigo" placeholder="Código Manual" style="padding:5px; width:110px; font-size:12px; background:#1f2937; color:#fff; border:1px solid #374151; border-radius:6px;"><button type="submit" class="btn" style="padding:5px 10px; font-size:12px;">Entrar</button></form>
-            <form action="/disputa/selecionar" method="POST" style="margin:0;"><select name="disputaId" onchange="this.form.submit()" style="padding:6px; font-weight:bold; color:#f59e0b; background:#1f2937; border:1px solid #374151; border-radius:6px;">${DB.disputas.map(d => `<option value="${d.id}" ${dispAtual.id===d.id?'selected':''}>${d.nome}</option>`).join('')}</select></form>
+            <form action="/disputa/selecionar" method="POST" style="margin:0;"><select name="disputaId" onchange="this.form.submit()" style="padding:6px; font-weight:bold; color:#f59e0b; background:#1f2937; border:1px solid #374151; border-radius:6px;">${db.disputas.map(d => `<option value="${d.id}" ${dispAtual.id===d.id?'selected':''}>${d.nome}</option>`).join('')}</select></form>
         </div>
     </div>`;
 
@@ -272,7 +307,7 @@ app.get('/', (req, res) => {
     }
 
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
-    const competidores = DB.membros[dispAtual.id] || [u];
+    const competidores = db.membros.get(dispAtual.id) || [u];
     competidores.forEach((p, index) => {
         let pontos = 0;
         if (dispAtual.id === "GLOBAL") { pontos = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0); }
@@ -280,9 +315,7 @@ app.get('/', (req, res) => {
     });
     htmlRanking += `</table>`;
 
-    // --- BLOCO DINÂMICO DE REGRAS DE PONTUAÇÃO CONFORME O MODO ---
     let htmlRegrasModo = `<div class="regras-box"><h4 style="margin:0 0 10px 0; font-size:14px; color:#f59e0b; text-transform:uppercase;">📌 Regras de Pontuação deste Grupo</h4>`;
-    
     if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
         htmlRegrasModo += `
         <div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:#10b981;">⚽ Modo Rodadas (Placares):</div>
@@ -290,11 +323,7 @@ app.get('/', (req, res) => {
         <div class="regras-item">✔️ <strong>15 Pontos:</strong> Acertar o resultado (Vitória/Empate), mas não a quantidade exata de gols.</div>
         <div class="regras-item">✔️ <strong>5 Pontos:</strong> Acertar apenas a quantidade de gols de uma das equipes na partida.</div>`;
     }
-    
-    if (dispAtual.modo === 'ambos') {
-        htmlRegrasModo += `<div style="margin: 10px 0; border-top: 1px dashed #374151;"></div>`;
-    }
-    
+    if (dispAtual.modo === 'ambos') { htmlRegrasModo += `<div style="margin: 10px 0; border-top: 1px dashed #374151;"></div>`; }
     if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
         htmlRegrasModo += `
         <div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:#10b981;">📊 Modo Grupos (Classificação):</div>
@@ -306,8 +335,9 @@ app.get('/', (req, res) => {
 
     let htmlG = '';
     if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
+        const palpiteGrupo = db.pClassif.get(dispAtual.id) || {};
         Object.keys(GRUPOS).forEach(g => {
-            const pal = (DB.pClassif[dispAtual.id] && DB.pClassif[dispAtual.id][u] && DB.pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
+            const pal = (palpiteGrupo[u] && palpiteGrupo[u][g]) || { primeiro: '', segundo: '' };
             htmlG += `<div class="card-g" style="margin-bottom:15px;">
                 <h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3>
                 ${GRUPOS[g].map(t => `<div style="margin:4px 0; font-size:14px;">${badge(t)} ${t}</div>`).join('')}
@@ -323,9 +353,10 @@ app.get('/', (req, res) => {
 
     let htmlP = '';
     if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
+        const palpitePlacar = db.pPlacar.get(dispAtual.id) || {};
         const jogosFase = PARTIDAS.filter(p => p.fase === faseAtiva);
         jogosFase.forEach(p => {
-            const pal = (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][u] && DB.pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
+            const pal = (palpitePlacar[u] && palpitePlacar[u][p.id]) || { golA: '', golB: '' };
             htmlP += `<div class="card-p">
                 <form action="/palpite/placar" method="POST" style="display:flex; width:100%; justify-content:space-between; align-items:center; margin:0;">
                     <input type="hidden" name="partidaId" value="${p.id}">
