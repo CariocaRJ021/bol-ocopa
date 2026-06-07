@@ -169,7 +169,6 @@ app.post('/grupo/criar', (req, res) => {
     res.redirect('/');
 });
 
-// CORRIGIDO: Variável unificada para evitar o ReferenceError no Render
 app.post('/grupo/entrar', (req, res) => {
     const cod = req.body.codigo.trim().toUpperCase();
     const grupoEncontrado = DB.disputas.find(g => g.id === cod);
@@ -209,7 +208,7 @@ app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 // --- ROTA INTERFACE PRINCIPAL ---
 app.get('/', (req, res) => {
-    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;} .container{max-width:1100px;margin:auto;} h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;} .btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;} .grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;} .card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;} .card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;} .row{display:flex;align-items:center;gap:10px;width:38%;} table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;} th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;} th{background:#10b981;color:#fff;}</style>`;
+    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;} .container{max-width:1100px;margin:auto;} h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px; margin-bottom:20px;} .btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;} .grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;} .card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:310px;border-top:4px solid #10b981;} .card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;} .row{display:flex;align-items:center;gap:10px;width:38%;} table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;} th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;} th{background:#10b981;color:#fff;} .regras-box{background:#111827; border:1px solid #1f2937; padding:15px 20px; border-radius:12px; margin-top:15px; border-left:5px solid #10b981;} .regras-item{margin:6px 0; font-size:13px; color:#9ca3af;} .regras-item strong{color:#f3f4f6;}</style>`;
 
     if (req.query.convite) { req.session.convitePendente = req.query.convite.trim().toUpperCase(); }
 
@@ -281,6 +280,30 @@ app.get('/', (req, res) => {
     });
     htmlRanking += `</table>`;
 
+    // --- BLOCO DINÂMICO DE REGRAS DE PONTUAÇÃO CONFORME O MODO ---
+    let htmlRegrasModo = `<div class="regras-box"><h4 style="margin:0 0 10px 0; font-size:14px; color:#f59e0b; text-transform:uppercase;">📌 Regras de Pontuação deste Grupo</h4>`;
+    
+    if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
+        htmlRegrasModo += `
+        <div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:#10b981;">⚽ Modo Rodadas (Placares):</div>
+        <div class="regras-item">✔️ <strong>25 Pontos:</strong> Placar exato da partida.</div>
+        <div class="regras-item">✔️ <strong>15 Pontos:</strong> Acertar o resultado (Vitória/Empate), mas não a quantidade exata de gols.</div>
+        <div class="regras-item">✔️ <strong>5 Pontos:</strong> Acertar apenas a quantidade de gols de uma das equipes na partida.</div>`;
+    }
+    
+    if (dispAtual.modo === 'ambos') {
+        htmlRegrasModo += `<div style="margin: 10px 0; border-top: 1px dashed #374151;"></div>`;
+    }
+    
+    if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
+        htmlRegrasModo += `
+        <div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:#10b981;">📊 Modo Grupos (Classificação):</div>
+        <div class="regras-item">✔️ <strong>25 Pontos:</strong> Acertar o 1º e o 2º lugar exatamente na ordem correta de classificação.</div>
+        <div class="regras-item">✔️ <strong>15 Pontos:</strong> Acertar o 1º e o 2º lugar, mas fora da ordem de classificação.</div>
+        <div class="regras-item">✔️ <strong>5 Pontos:</strong> Acertar exatamente apenas 1 dos países classificados.</div>`;
+    }
+    htmlRegrasModo += `</div>`;
+
     let htmlG = '';
     if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
         Object.keys(GRUPOS).forEach(g => {
@@ -322,6 +345,7 @@ app.get('/', (req, res) => {
         ${htmlLinkConvite}
         ${htmlSeletorFases}
         ${htmlRanking}
+        ${htmlRegrasModo}
         ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
         ${htmlP ? `<h2>2. Placares da Rodada — ${NOMES_FASES[faseAtiva]}</h2><div>${htmlP}</div>` : ''}
     </div>`);
