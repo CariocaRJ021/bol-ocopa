@@ -20,7 +20,8 @@ let DB = {
     pPlacar: {},
     gabaritoClassif: {}, 
     gabaritoPlacar: {},
-    historicoRanking: {} 
+    historicoRanking: {},
+    murais: {} // Armazena as mensagens de chat separadas por ID do grupo
 };
 
 function carregarDados() {
@@ -32,6 +33,7 @@ function carregarDados() {
             if (!DB.gabaritoPlacar) DB.gabaritoPlacar = {};
             if (!DB.historicoRanking) DB.historicoRanking = {};
             if (!DB.membros) DB.membros = { "GLOBAL": ["thiago", "sofia", "admin"] };
+            if (!DB.murais) DB.murais = {};
         } catch (e) {
             console.error("Erro ao ler arquivo de dados, usando estrutura inicial.");
         }
@@ -232,6 +234,46 @@ app.post('/grupo/entrar', (req, res) => {
 
 app.post('/disputa/selecionar', (req, res) => { req.session.dispId = req.body.disputaId; res.redirect('/'); });
 
+// --- ROTA DO MURAL DE PROVOCAÇÕES ---
+app.post('/mural/enviar', (req, res) => {
+    const dId = req.session.dispId || "GLOBAL";
+    const u = req.session.user;
+    const msg = req.body.mensagem.trim();
+    if (!msg) return res.redirect('/');
+
+    if (!DB.murais[dId]) DB.murais[dId] = [];
+    DB.murais[dId].unshift({ usuario: u, texto: msg, data: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });
+    
+    if (DB.murais[dId].length > 15) DB.murais[dId].pop(); // Mantém apenas as últimas 15 provocações
+    salvarDados();
+    res.redirect('/');
+});
+
+// --- ROTAS DO ADMIN TURBINADO ---
+app.post('/admin/usuario/senha', (req, res) => {
+    if (req.session.user !== 'admin') return res.status(403).send("Acesso negado.");
+    const { usuarioAlvo, novaSenha } = req.body;
+    const alvo = usuarioAlvo.trim().toLowerCase();
+    if (DB.usuarios[alvo]) {
+        DB.usuarios[alvo] = novaSenha;
+        salvarDados();
+    }
+    res.redirect('/');
+});
+
+app.post('/admin/usuario/remover', (req, res) => {
+    if (req.session.user !== 'admin') return res.status(403).send("Acesso negado.");
+    const { usuarioAlvo } = req.body;
+    const dId = req.session.dispId || "GLOBAL";
+    const alvo = usuarioAlvo.trim().toLowerCase();
+    
+    if (DB.membros[dId]) {
+        DB.membros[dId] = DB.membros[dId].filter(m => m !== alvo);
+        salvarDados();
+    }
+    res.redirect('/');
+});
+
 function verificarPrazoBloqueio(dataHoraPartida) {
     const agora = new Date();
     const limite = new Date(dataHoraPartida);
@@ -274,8 +316,8 @@ app.post('/admin/gabarito/grupo', (req, res) => {
 
 app.post('/admin/gabarito/placar', (req, res) => {
     if (req.session.user !== 'admin') return res.status(403).send("Acesso negado.");
-    const { partidaId, golA, golB } = req.body;
-    DB.gabaritoPlacar[partidaId] = { golA, golB };
+    const { partidaId, golA, golB, penA, penB } = req.body;
+    DB.gabaritoPlacar[partidaId] = { golA, golB, penA: penA || '', penB: penB || '' };
     salvarDados();
     res.redirect('/');
 });
@@ -312,6 +354,13 @@ app.get('/', (req, res) => {
         .regras-item{margin:6px 0;font-size:13px;color:#9ca3af;} 
         .admin-box{background:#1e1b4b;border:2px dashed #6366f1;padding:15px;border-radius:12px;margin-top:30px;}
         .secador-box{background:#1e293b;border:1px solid #3b82f6;padding:15px;border-radius:12px;margin:20px 0;}
+        
+        /* ESTILOS NOVOS: MURAL E LÍDER */
+        .mural-box{background:#1e293b; border:1px solid #475569; padding:12px; border-radius:12px; margin-bottom:20px;}
+        .mural-feed{max-height:110px; overflow-y:auto; margin-top:8px; background:#0f172a; padding:8px; border-radius:6px; font-size:12px;}
+        .mural-item{padding:4px 0; border-bottom:1px dashed #334155;}
+        .lider-row{background:linear-gradient(90deg, #2e2206, #111827) !important; border-left: 4px solid #f59e0b;}
+
         @media(max-width:600px){
             body{padding:8px;}
             .form-placar{flex-direction:column;align-items:stretch;text-align:center;}
@@ -336,7 +385,6 @@ app.get('/', (req, res) => {
     const faseAtiva = req.session.faseAtiva || "r1";
     const dispAtual = DB.disputas.find(d => d.id === dId) || DB.disputas[0];
 
-    // Se o usuário atual acessou o grupo mas não está listado no array, força a vinculação imediata
     vincularAoGrupo(dispAtual.id, u);
 
     let htmlLinkConvite = '';
@@ -354,6 +402,26 @@ app.get('/', (req, res) => {
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;" class="flex-wrap-header">
             <form action="/grupo/entrar" method="POST" style="margin:0; display:flex; gap:5px;"><input type="text" name="codigo" placeholder="Código" style="padding:6px; width:90px; font-size:12px;"><button type="submit" class="btn" style="padding:6px 10px; font-size:12px;">Entrar</button></form>
             <form action="/disputa/selecionar" method="POST" style="margin:0;"><select name="disputaId" onchange="this.form.submit()" style="padding:6px; font-weight:bold; color:#f59e0b;">${DB.disputas.map(d => `<option value="${d.id}" ${dispAtual.id===d.id?'selected':''}>${d.nome}</option>`).join('')}</select></form>
+        </div>
+    </div>`;
+
+    // --- INTERFACE DO MURAL DE PROVOCAÇÕES ---
+    const mensagensMural = DB.murais[dispAtual.id] || [];
+    let htmlMural = `
+    <div class="mural-box">
+        <h3 style="margin:0 0 8px 0; font-size:13px; color:#f59e0b; text-transform:uppercase;">💬 Mural de Provocações (${dispAtual.nome})</h3>
+        <form action="/mural/enviar" method="POST" style="display:flex; gap:6px;">
+            <input type="text" name="mensagem" placeholder="Solte a sua zueira da rodada..." required style="flex:1; padding:6px; font-size:13px;">
+            <button type="submit" class="btn" style="padding:6px 12px; font-size:13px;">Enviar</button>
+        </form>
+        <div class="mural-feed">
+            ${mensagensMural.length === 0 ? '<span style="color:#475569;">Nenhuma provocação enviada ainda...</span>' : mensagensMural.map(m => `
+                <div class="mural-item">
+                    <span style="color:#9ca3af; font-size:10px;">[${m.data}]</span> 
+                    <strong style="color:#10b981;">${m.usuario.toUpperCase()}:</strong> 
+                    <span style="color:#f3f4f6;">${m.texto}</span>
+                </div>
+            `).join('')}
         </div>
     </div>`;
 
@@ -385,7 +453,7 @@ app.get('/', (req, res) => {
         </div>`;
     }
 
-    // --- CORREÇÃO DO RANKING (PUXA OS MEMBROS DO GRUPO CORRETAMENTE) ---
+    // --- CORREÇÃO DO RANKING E ATRIBUIÇÃO DO LÍDER DESTAQUE ---
     let listaPontuou = [];
     const competidores = DB.membros[dispAtual.id] || [];
     if (!competidores.includes(u)) competidores.push(u); 
@@ -414,7 +482,7 @@ app.get('/', (req, res) => {
                 });
             }
         }
-        listaPontuou.push({ nome: jogador, pontos: totalPontos, exatos: totaisExatos, resultados: totaisResultados });
+        listaPontuou.push({ nome: politician = jogador, pontos: totalPontos, exatos: totaisExatos, resultados: totaisResultados });
     });
 
     listaPontuou.sort((a, b) => {
@@ -423,7 +491,6 @@ app.get('/', (req, res) => {
         return b.resultados - a.resultados;
     });
 
-    // --- HISTÓRICO DE CONFIGURAÇÃO DE SETAS SEM OVERWRITE ---
     if (!DB.historicoRanking[dispAtual.id]) DB.historicoRanking[dispAtual.id] = {};
     
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><div class="tabela-wrapper"><table><tr><th>Posição</th><th>Jogador</th><th>Pontos</th><th>Exatos</th><th>Resultados</th></tr>`;
@@ -440,16 +507,21 @@ app.get('/', (req, res) => {
         
         DB.historicoRanking[dispAtual.id][item.nome] = posAtual;
 
-        htmlRanking += `<tr>
+        // Destaque visual do Líder
+        const ehLider = posAtual === 1;
+        const classeLider = ehLider ? 'class="lider-row"' : '';
+        const coroa = ehLider ? '👑 ' : '';
+
+        htmlRanking += `<tr ${classeLider}>
             <td><strong>${posAtual}º</strong></td>
-            <td>${seta} <a href="/?verSecador=${item.nome}" style="color:#f3f4f6; text-decoration:none; font-weight:600; border-bottom:1px dashed #f59e0b;">${item.nome.toUpperCase()}</a> ${item.nome === u ? '<span style="font-size:11px; color:#10b981;">(Você)</span>' : ''}</td>
+            <td>${seta} ${coroa}<a href="/?verSecador=${item.nome}" style="color:#f3f4f6; text-decoration:none; font-weight:600; border-bottom:1px dashed #f59e0b;">${item.nome.toUpperCase()}</a> ${item.nome === u ? '<span style="font-size:11px; color:#10b981;">(Você)</span>' : ''}</td>
             <td style="color:#10b981; font-weight:bold;">${item.pontos} pts</td>
             <td style="color:#9ca3af;">${item.exatos}</td>
             <td style="color:#9ca3af;">${item.resultados}</td>
         </tr>`;
     });
     htmlRanking += `</table></div>`;
-    salvarDados(); // Salva os dados uma única vez ao renderizar o conjunto final
+    salvarDados();
 
     // --- SECADOR ---
     let htmlSecador = '';
@@ -529,7 +601,15 @@ app.get('/', (req, res) => {
 
         jogosFase.forEach(p => {
             const pal = (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][u] && DB.pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
-            const real = DB.gabaritoPlacar[p.id] ? `<div style="background:#1e1b4b; padding:2px 6px; border-radius:4px; font-size:11px; color:#6366f1;">Oficial: ${DB.gabaritoPlacar[p.id].golA} x ${DB.gabaritoPlacar[p.id].golB}</div>` : '';
+            const gabPlac = DB.gabaritoPlacar[p.id];
+            
+            // Renderização do resultado real incluindo pênaltis caso existam
+            let stringResultadoOficial = '';
+            if (gabPlac) {
+                let txtPen = (gabPlac.penA || gabPlac.penB) ? ` (Pên: ${gabPlac.penA}x${gabPlac.penB})` : '';
+                stringResultadoOficial = `<div style="background:#1e1b4b; padding:2px 6px; border-radius:4px; font-size:11px; color:#6366f1;">Oficial: ${gabPlac.golA} x ${gabPlac.golB}${txtPen}</div>`;
+            }
+
             const estaBloqueado = verificarPrazoBloqueio(p.dataHora);
 
             let stringTendencia = `📊 Sem palpites gravados`;
@@ -541,7 +621,7 @@ app.get('/', (req, res) => {
             htmlP += `<div class="card-p">
                 <form action="/palpite/placar" method="POST" class="form-placar">
                     <input type="hidden" name="partidaId" value="${p.id}">
-                    <div class="info-partida">${p.grupo.toUpperCase()} ${real}</div>
+                    <div class="info-partida">${p.grupo.toUpperCase()} ${stringResultadoOficial}</div>
                     <div class="time-box casa"><span>${p.tA}</span> ${badge(p.tA)}</div>
                     <div class="placar-inputs">
                         <input type="number" name="golA" value="${pal.golA}" ${estaBloqueado ? 'disabled' : ''}>
@@ -556,34 +636,62 @@ app.get('/', (req, res) => {
         });
     }
 
+    // --- PAINEL DO ADMINISTRADOR COMPLETO (COM REINICIALIZAÇÃO E REMOÇÃO) ---
     let htmlAdmin = '';
     if (u === 'admin') {
         let opcoesJogosFase = PARTIDAS.filter(p => p.fase === faseAtiva).map(p => `<option value="${p.id}">${p.grupo} - ${p.tA} x ${p.tB}</option>`).join('');
+        let opcoesMembros = competidores.map(m => `<option value="${m}">${m.toUpperCase()}</option>`).join('');
+
         htmlAdmin = `
         <div class="admin-box">
-            <h2 style="margin-top:0; color:#6366f1; border-left:5px solid #6366f1; font-size:14px;">⚙️ PAINEL DO ADMINISTRADOR</h2>
-            <div style="display:flex; gap:15px; flex-direction:column;">
+            <h2 style="margin-top:0; color:#6366f1; border-left:5px solid #6366f1; font-size:14px;">⚙️ PAINEL DO ADMINISTRADOR TURBINADO</h2>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:15px;">
+                
                 <div style="background:#111827; padding:12px; border-radius:8px;">
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#9ca3af;">⚽ GABARITO OFICIAL</h4>
                     <form action="/admin/gabarito/placar" method="POST">
-                        <select name="partidaId" style="width:100%; margin-bottom:10px;">${opcoesJogosFase}</select>
-                        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; justify-content:center;">
-                            <input type="number" name="golA" required style="width:70px; text-align:center;">
+                        <select name="partidaId" style="width:100%; margin-bottom:10px; font-size:12px;">${opcoesJogosFase}</select>
+                        <div style="display:flex; gap:10px; align-items:center; margin-bottom:6px; justify-content:center;">
+                            <input type="number" name="golA" placeholder="Gols A" required style="width:65px; text-align:center;">
                             <span>X</span>
-                            <input type="number" name="golB" required style="width:70px; text-align:center;">
+                            <input type="number" name="golB" placeholder="Gols B" required style="width:65px; text-align:center;">
                         </div>
-                        <button type="submit" class="btn" style="background:#6366f1; width:100%;">Gravar Placar</button>
+                        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; justify-content:center;">
+                            <input type="number" name="penA" placeholder="Pên A (Opc)" style="width:65px; text-align:center; font-size:11px; background:#111827;">
+                            <span style="font-size:10px; color:#475569;">Pênaltis</span>
+                            <input type="number" name="penB" placeholder="Pên B (Opc)" style="width:65px; text-align:center; font-size:11px; background:#111827;">
+                        </div>
+                        <button type="submit" class="btn" style="background:#6366f1; width:100%; font-size:12px;">Gravar Placar</button>
                     </form>
                 </div>
+
                 <div style="background:#111827; padding:12px; border-radius:8px;">
+                    <h4 style="margin:0 0 6px 0; font-size:12px; color:#9ca3af;">📊 GABARITO GRUPOS</h4>
                     <form action="/admin/gabarito/grupo" method="POST">
-                        <select name="grupo" id="admin_select_grupo" onchange="atualizarSeletorPaises(this.value)" style="width:100%; margin-bottom:10px;">
+                        <select name="grupo" id="admin_select_grupo" onchange="atualizarSeletorPaises(this.value)" style="width:100%; margin-bottom:10px; font-size:12px;">
                             ${Object.keys(GRUPOS).map(g => `<option value="${g}">Grupo ${g}</option>`).join('')}
                         </select>
-                        <select name="primeiro" id="admin_primeiro" style="width:100%; margin-bottom:6px;" required></select>
-                        <select name="segundo" id="admin_segundo" style="width:100%; margin-bottom:10px;" required></select>
-                        <button type="submit" class="btn" style="background:#6366f1; width:100%;">Gravar Ordem Grupo</button>
+                        <select name="primeiro" id="admin_primeiro" style="width:100%; margin-bottom:6px; font-size:12px;" required></select>
+                        <select name="segundo" id="admin_segundo" style="width:100%; margin-bottom:10px; font-size:12px;" required></select>
+                        <button type="submit" class="btn" style="background:#6366f1; width:100%; font-size:12px;">Gravar Ordem</button>
                     </form>
                 </div>
+
+                <div style="background:#111827; padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:8px;">
+                    <h4 style="margin:0; font-size:12px; color:#9ca3af;">👤 GERENCIAR MEMBROS DO GRUPO</h4>
+                    
+                    <form action="/admin/usuario/senha" method="POST" style="border-bottom:1px solid #1f2937; padding-bottom:8px; margin:0;">
+                        <select name="usuarioAlvo" style="width:100%; padding:4px; font-size:12px; margin-bottom:4px;">${opcoesMembros}</select>
+                        <input type="text" name="novaSenha" placeholder="Nova Senha" required style="width:100%; padding:4px; font-size:12px; margin-bottom:4px;">
+                        <button type="submit" class="btn" style="background:#475569; padding:4px; width:100%; font-size:11px;">Trocar Senha</button>
+                    </form>
+
+                    <form action="/admin/usuario/remover" method="POST" style="margin:0;" onsubmit="return confirm('Deseja mesmo remover este jogador do grupo?')">
+                        <select name="usuarioAlvo" style="width:100%; padding:4px; font-size:12px; margin-bottom:4px;">${opcoesMembros}</select>
+                        <button type="submit" class="btn" style="background:#ef4444; padding:4px; width:100%; font-size:11px;">Banir do Grupo</button>
+                    </form>
+                </div>
+
             </div>
         </div>`;
     }
@@ -592,6 +700,7 @@ app.get('/', (req, res) => {
         ${htmlTopo}
         ${htmlCriadorGrupo}
         ${htmlLinkConvite}
+        ${htmlMural}
         ${htmlRanking}
         ${htmlSecador}
         ${htmlRegrasModo}
