@@ -3,35 +3,52 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const app = express();
 
-// O Render define a porta automaticamente através de process.env.PORT
 const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'copa2026-key', resave: false, saveUninitialized: true }));
 
-// Dados de Teste Locais (Usuários e Pontuações Simuladas que você viu na tabela)
+// 1. BANCO DE DADOS EM MEMÓRIA
 const USUARIOS_CADASTRADOS = { "admin": "1234", "thiago": "1234", "sofia": "1234" };
 const disputasBase = [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }];
 const pClassif = {}; 
 const pPlacar = {};
 
-// Mapeamento de bandeiras e os 3 primeiros grupos de teste (Imagens 1 e 2)
-const PAISES = { "México": "mx", "África do Sul": "za", "Coreia do Sul": "kr", "Chéquia": "cz", "Canadá": "ca", "Brasil": "br", "Marrocos": "ma", "Estados Unidos": "us", "Paraguai": "py", "Alemanha": "de", "Inglaterra": "gb-eng", "Croácia": "hr" };
-const GRUPOS = { A: ["México", "África do Sul", "Coreia do Sul", "Chéquia"], B: ["Canadá", "Bósnia e Herzegovina", "Catar", "Suíça"], C: ["Brasil", "Marrocos", "Haiti", "Escócia"] };
+// 2. DICIONÁRIO DE BANDEIRAS OFICIAIS (Apenas as seleções dos Grupos A, B e C)
+const PAISES = { 
+    "Estados Unidos": "us", "Jamaica": "jm", "Ucrânia": "ua", "África do Sul": "za",
+    "México": "mx", "Costa Rica": "cr", "Polônia": "pl", "Tunísia": "tn",
+    "Canadá": "ca", "Panamá": "pa", "Chéquia": "cz", "Argélia": "dz"
+};
 
-const PARTIDAS = [];
-let idJogo = 1;
-Object.keys(GRUPOS).forEach(g => {
-    const times = GRUPOS[g];
-    PARTIDAS.push({ id: idJogo++, tA: times[0], tB: times[1], grupo: g });
-});
+// 3. ESTRUTURA REAL DOS GRUPOS A, B e C
+const GRUPOS = { 
+    A: ["Estados Unidos", "Jamaica", "Ucrânia", "África do Sul"], 
+    B: ["México", "Costa Rica", "Polônia", "Tunísia"], 
+    C: ["Canadá", "Panamá", "Chéquia", "Argélia"] 
+};
+
+// 4. JOGOS REAIS DA 1ª RODADA ORGANIZADOS POR GRUPO
+const PARTIDAS = [
+    // Grupo A - Rodada 1
+    { id: 1, tA: "Estados Unidos", tB: "Jamaica", grupo: "A" },
+    { id: 2, tA: "Ucrânia", tB: "África do Sul", grupo: "A" },
+    
+    // Grupo B - Rodada 1
+    { id: 3, tA: "México", tB: "Costa Rica", grupo: "B" },
+    { id: 4, tA: "Polônia", tB: "Tunísia", grupo: "B" },
+    
+    // Grupo C - Rodada 1
+    { id: 5, tA: "Canadá", tB: "Panamá", grupo: "C" },
+    { id: 6, tA: "Chéquia", tB: "Argélia", grupo: "C" }
+];
 
 function badge(time) {
     const c = PAISES[time];
     return c ? `<img src="https://flagcdn.com/w40/${c}.png" style="width:26px; border-radius:4px; vertical-align:middle; margin:0 6px;">` : '';
 }
 
-// Rotas de Processamento do Painel
+// 5. ROTAS DO SISTEMA
 app.post('/login', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     if (USUARIOS_CADASTRADOS[user] && USUARIOS_CADASTRADOS[user] === req.body.password) {
@@ -72,11 +89,10 @@ app.post('/palpite/placar', (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// Interface Visual que você viu no Render
+// 6. INTERFACE VISUAL ATUALIZADA
 app.get('/', (req, res) => {
     const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;}select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:300px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
 
-    // Captura o código vindo na URL (?convite=CODIGO)
     if (req.query.convite) {
         req.session.convitePendente = req.query.convite.trim().toUpperCase();
     }
@@ -89,18 +105,16 @@ app.get('/', (req, res) => {
     const dId = req.session.dispId;
     const dispAtual = disputasBase.find(d => d.id === dId) || disputasBase[0];
 
-    // Gera a caixinha com o link para colar no WhatsApp se estiver em um grupo customizado
     let htmlLinkConvite = '';
     if (dispAtual.id !== 'GLOBAL') {
         const linkCompleto = `https://meu-bolao-2026.onrender.com/?convite=${dispAtual.id}`;
         htmlLinkConvite = `
             <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:14px; color:#9ca3af;">✉️ Link de convite para este grupo:</span>
+                <span style="font-size:14px; color:#9ca3af;">✉ shrink_to_fit Link de convite para este grupo:</span>
                 <input type="text" value="${linkCompleto}" readonly onclick="this.select(); document.execCommand('copy'); alert('Link copiado!');" style="width:340px; color:#f59e0b; text-align:center; font-weight:bold; cursor:pointer;">
             </div>`;
     }
 
-    // Tabela com as Pontuações Simuladas das imagens de teste
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
     ["thiago", "sofia", "admin"].forEach((p, index) => {
         let pontosSimulados = p === "thiago" ? 12 : (p === "sofia" ? 9 : 0);
@@ -112,7 +126,7 @@ app.get('/', (req, res) => {
     if (dispAtual.modo === 'grupos' || dispAtual.modo === 'ambos') {
         Object.keys(GRUPOS).forEach(g => {
             const pal = (pClassif[dispAtual.id] && pClassif[dispAtual.id][u] && pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
-            htmlG += `<div class="card-g"><h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3><form action="/palpite/grupo" method="POST"><input type="hidden" name="grupo" value="${g}"><select name="primeiro" style="width:100%; margin-bottom:5px;"><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</select><select name="segundo" style="width:100%; margin-bottom:10px;"><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select><button type="submit" class="btn" style="width:100%; padding:4px; font-size:12px;">Salvar Grupo</button></form></div>`;
+            htmlG += `<div class="card-g"><h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3><form action="/palpite/grupo" method="POST"><input type="hidden" name="grupo" value="${g}"><select name="primeiro" style="width:100%; margin-bottom:5px;"><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</join('')}</select><select name="segundo" style="width:100%; margin-bottom:10px;"><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select><button type="submit" class="btn" style="width:100%; padding:4px; font-size:12px;">Salvar Grupo</button></form></div>`;
         });
     }
 
@@ -134,4 +148,7 @@ app.get('/', (req, res) => {
         </div>
 
         <div style="background:#111827; border:1px solid #1f2937; padding:20px; border-radius:12px; margin-bottom:20px;">
-            <h3
+            <h3 style="color:#f59e0b; margin:0 0 15px 0; font-size:14px; text-transform:uppercase;">➕ Criar Novo Grupo de Disputa</h3>
+            <form action="/grupo/criar" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; margin:0;">
+                <input type="text" name="nome" placeholder="Nome do Grupo (Ex: Galera da Quadra)" required style="flex:1; min-width:200px;">
+                <select name="modo" style="color:#f59e0b; font-weight
