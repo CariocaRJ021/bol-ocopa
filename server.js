@@ -18,8 +18,8 @@ let DB = {
     membros: { "GLOBAL": ["thiago", "sofia", "admin"] },
     pClassif: {},
     pPlacar: {},
-    gabaritoClassif: {}, // Guardará o resultado real dos grupos { GrupoA: { primeiro: 'X', segundo: 'Y' } }
-    gabaritoPlacar: {}    // Guardará o resultado real dos placares { partidaId: { golA: X, golB: Y } }
+    gabaritoClassif: {}, 
+    gabaritoPlacar: {}    
 };
 
 function carregarDados() {
@@ -27,7 +27,6 @@ function carregarDados() {
         try {
             const conteudo = fs.readFileSync(DATA_FILE, 'utf8');
             DB = JSON.parse(conteudo);
-            // Garante que os gabaritos existam caso o arquivo seja antigo
             if (!DB.gabaritoClassif) DB.gabaritoClassif = {};
             if (!DB.gabaritoPlacar) DB.gabaritoPlacar = {};
         } catch (e) {
@@ -130,33 +129,47 @@ function calcularPontosPlacar(palpite, real) {
     const gA_real = parseInt(real.golA);
     const gB_real = parseInt(real.golB);
 
-    // 25 Pontos: Placar exato
     if (gA_pal === gA_real && gB_pal === gB_real) return 25;
 
     const saldo_pal = gA_pal - gB_pal;
     const saldo_real = gA_real - gB_real;
-    
     const acertouResultado = (saldo_pal > 0 && saldo_real > 0) || (saldo_pal < 0 && saldo_real < 0) || (saldo_pal === 0 && saldo_real === 0);
 
-    // 15 Pontos: Acertar resultado (Vitória/Empate) mas não o placar exato
     if (acertouResultado) return 15;
-
-    // 5 Pontos: Acertar apenas os gols de uma das equipes
     if (gA_pal === gA_real || gB_pal === gB_real) return 5;
 
     return 0;
 }
 
+// Script auxiliar para injetar dinamicamente as opções de países no seletor do admin via Front-End
+const SCRIPT_DINAMICO = `
+<script>
+    const gruposData = ${JSON.stringify(GRUPOS)};
+    function atualizarSeletorPaises(grupoLetra) {
+        const p1 = document.getElementById('admin_primeiro');
+        const p2 = document.getElementById('admin_segundo');
+        const paises = gruposData[grupoLetra] || [];
+        
+        p1.innerHTML = '<option value="">Escolha o 1º</option>';
+        p2.innerHTML = '<option value="">Escolha o 2º</option>';
+        
+        paises.forEach(p => {
+            p1.innerHTML += \`<option value="\${p}">\${p}</option>\`;
+            p2.innerHTML += \`<option value="\${p}">\${p}</option>\`;
+        });
+    }
+    window.onload = function() {
+        const selectGrupo = document.getElementById('admin_select_grupo');
+        if(selectGrupo) { atualizarSeletorPaises(selectGrupo.value); }
+    }
+</script>
+`;
+
 function calcularPontosClassif(palpite, real) {
     if (!palpite || !palpite.primeiro || !palpite.segundo || !real || !real.primeiro || !real.segundo) return 0;
 
-    // 25 Pontos: 1º e 2º lugar exatamente na ordem correta
     if (palpite.primeiro === real.primeiro && palpite.segundo === real.segundo) return 25;
-
-    // 15 Pontos: Acertou os dois classificados, mas inverteu as posições
     if (palpite.primeiro === real.segundo && palpite.segundo === real.primeiro) return 15;
-
-    // 5 Pontos: Acertou exatamente apenas 1 dos países classificados
     if (palpite.primeiro === real.primeiro || palpite.segundo === real.segundo || palpite.primeiro === real.segundo || palpite.segundo === real.primeiro) return 5;
 
     return 0;
@@ -186,8 +199,12 @@ app.post('/cadastrar', (req, res) => {
     req.session.user = user;
     req.session.dispId = req.session.convitePendente || "GLOBAL";
     req.session.faseAtiva = "r1";
+    
+    // CORREÇÃO: Vincula e força a persistência imediata no arquivo JSON
     vincularAoGrupo("GLOBAL", user);
     vincularAoGrupo(req.session.dispId, user);
+    salvarDados(); 
+
     res.redirect('/');
 });
 
@@ -241,10 +258,11 @@ app.post('/palpite/placar', (req, res) => {
     res.redirect('/');
 });
 
-// --- ROTAS DO ADMINISTRADOR (SALVAR RESULTADOS REAIS) ---
+// --- ROTAS DO ADMINISTRADOR ---
 app.post('/admin/gabarito/grupo', (req, res) => {
     if (req.session.user !== 'admin') return res.status(403).send("Acesso negado.");
     const { grupo, primeiro, segundo } = req.body;
+    if(!primeiro || !segundo) return res.send("<h3>Selecione os dois países! <a href='/'>Voltar</a></h3>");
     DB.gabaritoClassif[grupo] = { primeiro, segundo };
     salvarDados();
     res.redirect('/');
@@ -284,7 +302,7 @@ app.get('/', (req, res) => {
         htmlLinkConvite = `
             <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:14px; color:#9ca3af;">✉️ Link de convite para este grupo:</span>
-                <input type="text" value="https://${req.get('host')}/?convite=${dispAtual.id}" readonly onclick="this.select(); alert('Link copiado!');" style="width:340px; color:#f59e0b; text-align:center; font-weight:bold; background:#1f2937; border:1px solid #374151; padding:4px; border-radius:4px;">
+                <input type="text" value="https://${req.get('host')}/?convite=${dispAtual.id}" readonly onclick="this.select(); alert('Link copied!');" style="width:340px; color:#f59e0b; text-align:center; font-weight:bold; background:#1f2937; border:1px solid #374151; padding:4px; border-radius:4px;">
             </div>`;
     }
 
@@ -325,14 +343,12 @@ app.get('/', (req, res) => {
         </div>`;
     }
 
-    // --- CÁLCULO DINÂMICO DO RANKING REAL ---
     let listaPontuou = [];
     const competidores = DB.membros[dispAtual.id] || [u];
     
     competidores.forEach(jogador => {
         let totalPontos = 0;
 
-        // Calcula pontos de classificação de grupos (se o modo permitir)
         if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
             if (DB.pClassif[dispAtual.id] && DB.pClassif[dispAtual.id][jogador]) {
                 Object.keys(GRUPOS).forEach(g => {
@@ -343,7 +359,6 @@ app.get('/', (req, res) => {
             }
         }
 
-        // Calcula pontos de placares de rodadas (se o modo permitir)
         if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
             if (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][jogador]) {
                 PARTIDAS.forEach(p => {
@@ -354,10 +369,9 @@ app.get('/', (req, res) => {
             }
         }
 
-        listaPontuou.push({ nome: jogador, pontos: totalPontos });
+        listaPontuou.push({ nome: grandmother = jogador, pontos: totalPontos });
     });
 
-    // Ordena o ranking do maior para o menor pontuador
     listaPontuou.sort((a, b) => b.pontos - a.pontos);
 
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
@@ -424,14 +438,13 @@ app.get('/', (req, res) => {
         });
     }
 
-    // --- PAINEL EXCLUSIVO DO ADMIN PARA LANÇAR OS GABARITOS REAIS ---
     let htmlAdmin = '';
     if (u === 'admin') {
         let opcoesJogosFase = PARTIDAS.filter(p => p.fase === faseAtiva).map(p => `<option value="${p.id}">${p.grupo} - ${p.tA} x ${p.tB}</option>`).join('');
         
         htmlAdmin = `
         <div class="admin-box">
-            <h2 style="margin-top:0; color:#6366f1; border-left:5px solid #6366f1;">⚙️ PAINEL DO ADMINISTRADOR (Lançar Resultados Reais)</h2>
+            <h2 style="margin-top:0; color:#6366f1; border-left:5px solid #6366f1;">⚙️ PAINEL DO ADMINISTRADOR</h2>
             <div style="display:flex; gap:20px; flex-wrap:wrap;">
                 
                 <div style="flex:1; min-width:280px; background:#111827; padding:15px; border-radius:8px;">
@@ -450,17 +463,18 @@ app.get('/', (req, res) => {
                 <div style="flex:1; min-width:280px; background:#111827; padding:15px; border-radius:8px;">
                     <h4 style="margin:0 0 10px 0; color:#fff;">📊 Definir Classificados Oficiais do Grupo</h4>
                     <form action="/admin/gabarito/grupo" method="POST">
-                        <select name="grupo" style="width:100%; margin-bottom:10px;">
+                        <select name="grupo" id="admin_select_grupo" onchange="atualizarSeletorPaises(this.value)" style="width:100%; margin-bottom:10px;">
                             ${Object.keys(GRUPOS).map(g => `<option value="${g}">Grupo ${g}</option>`).join('')}
                         </select>
-                        <input type="text" name="primeiro" placeholder="Nome exato do 1º Lugar" required style="width:100%; margin-bottom:5px;">
-                        <input type="text" name="segundo" placeholder="Nome exato do 2º Lugar" required style="width:100%; margin-bottom:10px;">
+                        <select name="primeiro" id="admin_primeiro" style="width:100%; margin-bottom:5px;" required></select>
+                        <select name="segundo" id="admin_segundo" style="width:100%; margin-bottom:10px;" required></select>
                         <button type="submit" class="btn" style="background:linear-gradient(135deg,#6366f1,#4f46e5); width:100%;">Gravar Classificação Oficial</button>
                     </form>
                 </div>
 
             </div>
-        </div>`;
+        </div>
+        ${SCRIPT_DINAMICO}`;
     }
 
     res.send(`${css}<div class="container">
