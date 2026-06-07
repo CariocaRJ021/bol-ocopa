@@ -19,7 +19,8 @@ let DB = {
     pClassif: {},
     pPlacar: {},
     gabaritoClassif: {}, 
-    gabaritoPlacar: {}    
+    gabaritoPlacar: {},
+    historicoRanking: {} // Guarda posições das rodadas anteriores para calcular as setas
 };
 
 function carregarDados() {
@@ -29,6 +30,7 @@ function carregarDados() {
             DB = JSON.parse(conteudo);
             if (!DB.gabaritoClassif) DB.gabaritoClassif = {};
             if (!DB.gabaritoPlacar) DB.gabaritoPlacar = {};
+            if (!DB.historicoRanking) DB.historicoRanking = {};
         } catch (e) {
             console.error("Erro ao ler arquivo de dados, usando estrutura inicial.");
         }
@@ -76,32 +78,33 @@ const GRUPOS = {
     L: ["Inglaterra", "Croácia", "Gana", "Panamá"]
 };
 
-// --- GERADOR DINÂMICO DO CALENDÁRIO ---
+// --- GERADOR DINÂMICO DO CALENDÁRIO COM DATAS E HORÁRIOS DE BLOQUEIO ---
 const PARTIDAS = [];
 let idPartida = 1;
 
-Object.keys(GRUPOS).forEach(g => {
+// Simulando horários e datas para controle de travas automáticas (Junho/Julho de 2026)
+Object.keys(GRUPOS).forEach((g, idx) => {
     const [t1, t2, t3, t4] = GRUPOS[g];
-    PARTIDAS.push({ id: idPartida++, tA: t1, tB: t2, grupo: `Grupo ${g}`, fase: "r1" });
-    PARTIDAS.push({ id: idPartida++, tA: t3, tB: t4, grupo: `Grupo ${g}`, fase: "r1" });
+    PARTIDAS.push({ id: idPartida++, tA: t1, tB: t2, grupo: `Grupo ${g}`, fase: "r1", dataHora: `2026-06-11T${14 + (idx % 3)}:00:00` });
+    PARTIDAS.push({ id: idPartida++, tA: t3, tB: t4, grupo: `Grupo ${g}`, fase: "r1", dataHora: `2026-06-11T${17 + (idx % 2)}:00:00` });
 });
-Object.keys(GRUPOS).forEach(g => {
+Object.keys(GRUPOS).forEach((g, idx) => {
     const [t1, t2, t3, t4] = GRUPOS[g];
-    PARTIDAS.push({ id: idPartida++, tA: t1, tB: t3, grupo: `Grupo ${g}`, fase: "r2" });
-    PARTIDAS.push({ id: idPartida++, tA: t2, tB: t4, grupo: `Grupo ${g}`, fase: "r2" });
+    PARTIDAS.push({ id: idPartida++, tA: t1, tB: t3, grupo: `Grupo ${g}`, fase: "r2", dataHora: `2026-06-16T${14 + (idx % 3)}:00:00` });
+    PARTIDAS.push({ id: idPartida++, tA: t2, tB: t4, grupo: `Grupo ${g}`, fase: "r2", dataHora: `2026-06-16T${17 + (idx % 2)}:00:00` });
 });
-Object.keys(GRUPOS).forEach(g => {
+Object.keys(GRUPOS).forEach((g, idx) => {
     const [t1, t2, t3, t4] = GRUPOS[g];
-    PARTIDAS.push({ id: idPartida++, tA: t4, tB: t1, grupo: `Grupo ${g}`, fase: "r3" });
-    PARTIDAS.push({ id: idPartida++, tA: t2, tB: t3, grupo: `Grupo ${g}`, fase: "r3" });
+    PARTIDAS.push({ id: idPartida++, tA: t4, tB: t1, grupo: `Grupo ${g}`, fase: "r3", dataHora: `2026-06-21T16:00:00` });
+    PARTIDAS.push({ id: idPartida++, tA: t2, tB: t3, grupo: `Grupo ${g}`, fase: "r3", dataHora: `2026-06-21T20:00:00` });
 });
 
-for (let i = 1; i <= 16; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `16avos - Jg ${i}`, fase: "16avos" }); }
-for (let i = 1; i <= 8; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Oitavas - Jg ${i}`, fase: "oitavas" }); }
-for (let i = 1; i <= 4; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Quartas - Jg ${i}`, fase: "quartas" }); }
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 1", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 2", fase: "semis" });
-PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Grande Final", fase: "final" });
+for (let i = 1; i <= 16; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `16avos - Jg ${i}`, fase: "16avos", dataHora: `2026-06-25T16:00:00` }); }
+for (let i = 1; i <= 8; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Oitavas - Jg ${i}`, fase: "oitavas", dataHora: `2026-06-29T17:00:00` }); }
+for (let i = 1; i <= 4; i++) { PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: `Quartas - Jg ${i}`, fase: "quartas", dataHora: `2026-07-04T17:00:00` }); }
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 1", fase: "semis", dataHora: `2026-07-08T21:00:00` });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Semifinal 2", fase: "semis", dataHora: `2026-07-09T21:00:00` });
+PARTIDAS.push({ id: idPartida++, tA: "A definir", tB: "A definir", grupo: "Grande Final", fase: "final", dataHora: `2026-07-19T18:00:00` });
 
 const NOMES_FASES = {
     "r1": "Fase de Grupos - 1ª Rodada", "r2": "Fase de Grupos - 2ª Rodada", "r3": "Fase de Grupos - 3ª Rodada",
@@ -121,37 +124,61 @@ function vincularAoGrupo(disputaId, usuario) {
 }
 
 // --- MOTORES DE CÁLCULO DE PONTOS ---
-function calcularPontosPlacar(palpite, real) {
-    if (!palpite || palpite.golA === '' || palpite.golB === '' || !real || real.golA === '' || real.golB === '') return 0;
+function obterMetricasRodada(palpite, real) {
+    let pontos = 0;
+    let exato = 0;
+    let resultado = 0;
+
+    if (!palpite || palpite.golA === '' || palpite.golB === '' || !real || real.golA === '' || real.golB === '') {
+        return { pontos, exato, resultado };
+    }
     
     const gA_pal = parseInt(palpite.golA);
     const gB_pal = parseInt(palpite.golB);
     const gA_real = parseInt(real.golA);
     const gB_real = parseInt(real.golB);
 
-    if (gA_pal === gA_real && gB_pal === gB_real) return 25;
+    if (gA_pal === gA_real && gB_pal === gB_real) {
+        return { pontos: 25, exato: 1, resultado: 0 };
+    }
 
     const saldo_pal = gA_pal - gB_pal;
     const saldo_real = gA_real - gB_real;
     const acertouResultado = (saldo_pal > 0 && saldo_real > 0) || (saldo_pal < 0 && saldo_real < 0) || (saldo_pal === 0 && saldo_real === 0);
 
-    if (acertouResultado) return 15;
-    if (gA_pal === gA_real || gB_pal === gB_real) return 5;
+    if (acertouResultado) {
+        return { pontos: 15, exato: 0, resultado: 1 };
+    }
+    if (gA_pal === gA_real || gB_pal === gB_real) {
+        return { pontos: 5, exato: 0, resultado: 0 };
+    }
 
-    return 0;
+    return { pontos, exato, resultado };
 }
 
-function calcularPontosClassif(palpite, real) {
-    if (!palpite || !palpite.primeiro || !palpite.segundo || !real || !real.primeiro || !real.segundo) return 0;
+function obterMetricasClassif(palpite, real) {
+    let pontos = 0;
+    let exato = 0;
+    let resultado = 0;
 
-    if (palpite.primeiro === real.primeiro && palpite.segundo === real.segundo) return 25;
-    if (palpite.primeiro === real.segundo && palpite.segundo === real.primeiro) return 15;
-    if (palpite.primeiro === real.primeiro || palpite.segundo === real.segundo || palpite.primeiro === real.segundo || palpite.segundo === real.primeiro) return 5;
+    if (!palpite || !palpite.primeiro || !palpite.segundo || !real || !real.primeiro || !real.segundo) {
+        return { pontos, exato, resultado };
+    }
 
-    return 0;
+    if (palpite.primeiro === real.primeiro && palpite.segundo === real.segundo) {
+        return { pontos: 25, exato: 1, resultado: 0 };
+    }
+    if (palpite.primeiro === real.segundo && palpite.segundo === real.primeiro) {
+        return { pontos: 15, exato: 0, resultado: 1 };
+    }
+    if (palpite.primeiro === real.primeiro || palpite.segundo === real.segundo || palpite.primeiro === real.segundo || palpite.segundo === real.primeiro) {
+        return { pontos: 5, exato: 0, resultado: 0 };
+    }
+
+    return { pontos, exato, resultado };
 }
 
-// SCRIPT MELHORADO: Controla os selects do admin e gerencia a memória de posição do Scroll (LocalStorage)
+// SCRIPT PRINCIPAL DINÂMICO
 const SCRIPT_DINAMICO = `
 <script>
     const gruposData = ${JSON.stringify(GRUPOS)};
@@ -171,7 +198,6 @@ const SCRIPT_DINAMICO = `
         });
     }
 
-    // Grava a posição do Scroll quando o usuário move a tela
     window.addEventListener('scroll', function() {
         localStorage.setItem('bolao_scroll_pos', window.scrollY);
     });
@@ -180,13 +206,9 @@ const SCRIPT_DINAMICO = `
         const selectGrupo = document.getElementById('admin_select_grupo');
         if(selectGrupo) { atualizarSeletorPaises(selectGrupo.value); }
 
-        // Restaura a posição salva do scroll se ela existir
         const posSalva = localStorage.getItem('bolao_scroll_pos');
         if (posSalva) {
-            window.scrollTo({
-                top: parseInt(posSalva),
-                behavior: 'instant'
-            });
+            window.scrollTo({ top: parseInt(posSalva), behavior: 'instant' });
         }
     }
 </script>
@@ -228,7 +250,6 @@ app.post('/fase/selecionar', (req, res) => {
     req.session.faseAtiva = req.body.faseId;
     res.redirect('/');
 });
-app.get('/fase/selecionar', (req, res) => { res.redirect('/'); });
 
 app.post('/grupo/criar', (req, res) => {
     const codigoUnico = 'COPA-' + Math.random().toString(36).substr(2, 4).toUpperCase();
@@ -254,9 +275,23 @@ app.post('/disputa/selecionar', (req, res) => {
     res.redirect('/'); 
 });
 
+// Validação Anti-Fraude de Horário no Servidor (30 minutos antes)
+function verificarPrazoBloqueio(dataHoraPartida) {
+    const agora = new Date();
+    const limite = new Date(dataHoraPartida);
+    limite.setMinutes(limite.getMinutes() - 30);
+    return agora > limite; // Retorna true se estiver bloqueado
+}
+
 app.post('/palpite/grupo', (req, res) => {
     const { grupo, primeiro, segundo } = req.body; 
     const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
+    
+    // Como os grupos fecham no primeiro jogo da copa, travamos com base no primeiro jogo da r1
+    if(verificarPrazoBloqueio(PARTIDAS[0].dataHora)) {
+        return res.send("<h3>Prazo encerrado para palpites de grupos! <a href='/'>Voltar</a></h3>");
+    }
+
     if (!DB.pClassif[dId]) DB.pClassif[dId] = {}; 
     if (!DB.pClassif[dId][u]) DB.pClassif[dId][u] = {};
     DB.pClassif[dId][u][grupo] = { primeiro, segundo };
@@ -267,6 +302,12 @@ app.post('/palpite/grupo', (req, res) => {
 app.post('/palpite/placar', (req, res) => {
     const { partidaId, golA, golB } = req.body; 
     const dId = req.session.dispId || "GLOBAL"; const u = req.session.user;
+    
+    const jogo = PARTIDAS.find(p => p.id == partidaId);
+    if (jogo && verificarPrazoBloqueio(jogo.dataHora)) {
+        return res.send("<h3>Erro! Esta partida já começou ou passou do limite de 30 minutos antecedentes. <a href='/'>Voltar</a></h3>");
+    }
+
     if (!DB.pPlacar[dId]) DB.pPlacar[dId] = {}; 
     if (!DB.pPlacar[dId][u]) DB.pPlacar[dId][u] = {};
     DB.pPlacar[dId][u][partidaId] = { golA, golB };
@@ -304,6 +345,7 @@ app.get('/', (req, res) => {
         h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:16px;text-transform:uppercase;margin-top:30px;margin-bottom:15px;} 
         .btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:10px 15px;font-weight:600;cursor:pointer;border-radius:6px;transition:0.2s;} 
         .btn:hover{opacity:0.9;} 
+        .btn:disabled{background:#4b5563;cursor:not-allowed;opacity:0.5;}
         select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:10px;border-radius:6px;box-sizing:border-box;} 
         
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:15px;justify-content:center;} 
@@ -317,6 +359,9 @@ app.get('/', (req, res) => {
         .time-box.fora{justify-content:flex-start;text-align:left;}
         .placar-inputs{display:flex;align-items:center;gap:6px;}
         .placar-inputs input{width:45px;text-align:center;padding:6px;font-weight:bold;font-size:16px;}
+        .placar-inputs input:disabled{background:#374151;color:#9ca3af;border:1px dashed #4b5563;}
+
+        .tendencia-bar{font-size:10px;color:#9ca3af;margin-top:4px;display:flex;gap:8px;justify-content:center;width:100%;font-weight:600;}
         
         .flex-wrap-header{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;}
         .tabela-wrapper{width:100%;overflow-x:auto;background:#111827;border-radius:8px;}
@@ -326,6 +371,8 @@ app.get('/', (req, res) => {
         .regras-box{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;margin-top:15px;border-left:5px solid #10b981;} 
         .regras-item{margin:6px 0;font-size:13px;color:#9ca3af;} 
         .admin-box{background:#1e1b4b;border:2px dashed #6366f1;padding:15px;border-radius:12px;margin-top:30px;}
+
+        .secador-box{background:#1e293b;border:1px solid #3b82f6;padding:15px;border-radius:12px;margin:20px 0;}
 
         @media(max-width:600px){
             body{padding:8px;}
@@ -402,18 +449,24 @@ app.get('/', (req, res) => {
         </div>`;
     }
 
+    // --- CÁLCULO COMPLETO DO RANKING COM CRITÉRIOS DE DESEMPATE DA SUGESTÃO 4 ---
     let listaPontuou = [];
     const competidores = DB.membros[dispAtual.id] || [u];
     
     competidores.forEach(jogador => {
         let totalPontos = 0;
+        let totaisExatos = 0;
+        let totaisResultados = 0;
 
         if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
             if (DB.pClassif[dispAtual.id] && DB.pClassif[dispAtual.id][jogador]) {
                 Object.keys(GRUPOS).forEach(g => {
                     const palpite = DB.pClassif[dispAtual.id][jogador][g];
                     const real = DB.gabaritoClassif[g];
-                    totalPontos += calcularPontosClassif(palpite, real);
+                    const resMetrica = obterMetricasClassif(palpite, real);
+                    totalPontos += resMetrica.pontos;
+                    totaisExatos += resMetrica.exato;
+                    totaisResultados += resMetrica.resultado;
                 });
             }
         }
@@ -423,21 +476,86 @@ app.get('/', (req, res) => {
                 PARTIDAS.forEach(p => {
                     const palpite = DB.pPlacar[dispAtual.id][jogador][p.id];
                     const real = DB.gabaritoPlacar[p.id];
-                    totalPontos += calcularPontosPlacar(palpite, real);
+                    const resMetrica = obterMetricasRodada(palpite, real);
+                    totalPontos += resMetrica.pontos;
+                    totaisExatos += resMetrica.exato;
+                    totaisResultados += resMetrica.resultado;
                 });
             }
         }
 
-        listaPontuou.push({ nome: joker = jogador, pontos: totalPontos });
+        listaPontuou.push({ nome: jogador, pontos: totalPontos, exatos: totaisExatos, resultados: totaisResultados });
     });
 
-    listaPontuou.sort((a, b) => b.pontos - a.pontos);
+    // Ordenação Avançada: Pontos > Placares Exatos > Resultados de vitória/empate
+    listaPontuou.sort((a, b) => {
+        if (b.pontos !== a.pontos) return b.pontos - a.pontos;
+        if (b.exatos !== a.exatos) return b.exatos - a.exatos;
+        return b.resultados - a.resultados;
+    });
 
-    let htmlRanking = `<h2>🏆 Classificação Geral</h2><div class="tabela-wrapper"><table><tr><th>Posição</th><th>Jogador</th><th>Pontos</th></tr>`;
+    // --- GERADOR DAS SETAS DE EVOLUÇÃO (SUGESTÃO 5) ---
+    if (!DB.historicoRanking[dispAtual.id]) DB.historicoRanking[dispAtual.id] = {};
+    
+    let htmlRanking = `<h2>🏆 Classificação Geral</h2><div class="tabela-wrapper"><table><tr><th>Posição</th><th>Jogador</th><th>Pontos</th><th>Exatos (25)</th><th>Resultados (15)</th></tr>`;
+    
     listaPontuou.forEach((item, index) => {
-        htmlRanking += `<tr><td><strong>${index + 1}º</strong></td><td>${item.nome.toUpperCase()}</td><td style="color:#10b981; font-weight:bold;">${item.pontos} pts</td></tr>`;
+        const posAtual = index + 1;
+        const posAntiga = DB.historicoRanking[dispAtual.id][item.nome];
+        let seta = `<span style="color:#9ca3af; margin-right:5px;">▬</span>`; // Estável por padrão
+        
+        if (posAntiga) {
+            if (posAtual < posAntiga) seta = `<span style="color:#10b981; margin-right:5px; font-weight:bold;">▲</span>`;
+            if (posAtual > posAntiga) seta = `<span style="color:#ef4444; margin-right:5px; font-weight:bold;">▼</span>`;
+        }
+        
+        // Atualiza a foto do histórico local na memória
+        DB.historicoRanking[dispAtual.id][item.nome] = posAtual;
+
+        htmlRanking += `<tr>
+            <td><strong>${posAtual}º</strong></td>
+            <td>${seta} <a href="/?verSecador=${item.nome}" style="color:#f3f4f6; text-decoration:none; font-weight:600; border-bottom:1px dashed #f59e0b;">${item.nome.toUpperCase()}</a></td>
+            <td style="color:#10b981; font-weight:bold;">${item.pontos} pts</td>
+            <td style="text-align:center; color:#9ca3af;">${item.exatos}</td>
+            <td style="text-align:center; color:#9ca3af;">${item.resultados}</td>
+        </tr>`;
     });
     htmlRanking += `</table></div>`;
+    salvarDados(); // Grava a nova foto histórica de posições
+
+    // --- O "SECADOR" - VISUALIZAÇÃO DE PALPITES ALHEIOS (SUGESTÃO 1) ---
+    let htmlSecador = '';
+    if (req.query.verSecador) {
+        const alvo = req.query.verSecador.trim().toLowerCase();
+        if (competidores.includes(alvo)) {
+            htmlSecador = `<div class="secador-box">
+                <div style="display:flex; justify-content:between; align-items:center; margin-bottom:10px; width:100%;">
+                    <h3 style="margin:0; font-size:14px; color:#3b82f6;">🔍 ESPIANDO PALPITES DE: <span style="color:#f59e0b;">${alvo.toUpperCase()}</span></h3>
+                    <a href="/" style="color:#ef4444; text-decoration:none; font-size:12px; font-weight:bold; margin-left:auto;">[Fechar X]</a>
+                </div>
+                <p style="font-size:11px; margin:0 0 10px 0; color:#9ca3af;">Exibindo palpites correspondentes à rodada selecionada no painel abaixo.</p>`;
+            
+            const jogosFase = PARTIDAS.filter(p => p.fase === faseAtiva);
+            jogosFase.forEach(p => {
+                const palAlvo = (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][alvo] && DB.pPlacar[dispAtual.id][alvo][p.id]) || { golA: '-', golB: '-' };
+                const estaBloqueado = verificarPrazoBloqueio(p.dataHora);
+                
+                // Regra de privacidade: Só exibe se o jogo já estiver bloqueado (começou) ou se for o próprio usuário
+                if (estaBloqueado || u === alvo) {
+                    htmlSecador += `<div style="font-size:12px; background:#111827; padding:6px 12px; margin:4px 0; border-radius:6px; display:flex; justify-content:space-between;">
+                        <span>${p.tA} ${palAlvo.golA} x ${palAlvo.golB} ${p.tB}</span>
+                        <span style="color:#9ca3af; font-size:10px;">${p.grupo}</span>
+                    </div>`;
+                } else {
+                    htmlSecador += `<div style="font-size:12px; background:#111827; padding:6px 12px; margin:4px 0; border-radius:6px; display:flex; justify-content:space-between; color:#4b5563;">
+                        <span>${p.tA} 🔒 PRIVADO x 🔒 PRIVADO ${p.tB}</span>
+                        <span style="color:#4b5563; font-size:10px;">Aberto p/ alteração</span>
+                    </div>`;
+                }
+            });
+            htmlSecador += `</div>`;
+        }
+    }
 
     let htmlRegrasModo = `<div class="regras-box"><h4 style="margin:0 0 10px 0; font-size:13px; color:#f59e0b; text-transform:uppercase;">📌 Regras de Pontuação</h4>`;
     if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
@@ -455,18 +573,21 @@ app.get('/', (req, res) => {
 
     let htmlG = '';
     if (dispAtual.modo === 'groups' || dispAtual.modo === 'ambos') {
+        // Trava geral de grupos baseada no primeiro jogo da Copa
+        const gruposBloqueados = verificarPrazoBloqueio(PARTIDAS[0].dataHora);
+
         Object.keys(GRUPOS).forEach(g => {
             const pal = (DB.pClassif[dispAtual.id] && DB.pClassif[dispAtual.id][u] && DB.pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
             const real = DB.gabaritoClassif[g] ? `<div style="margin-top:8px; font-size:11px; background:#1e1b4b; padding:6px; border-radius:4px; text-align:center; color:#a5b4fc;">Oficial: 1º ${DB.gabaritoClassif[g].primeiro} | 2º ${DB.gabaritoClassif[g].segundo}</div>` : '';
             
             htmlG += `<div class="card-g">
-                <h3 style="color:#10b981; margin:0 0 10px 0; font-size:15px;">Grupo ${g}</h3>
+                <h3 style="color:#10b981; margin:0 0 10px 0; font-size:15px;">Grupo ${g} ${gruposBloqueados ? '🔒' : ''}</h3>
                 ${GRUPOS[g].map(t => `<div style="margin:6px 0; font-size:13px; display:flex; align-items:center;">${badge(t)} ${t}</div>`).join('')}
                 <form action="/palpite/grupo" method="POST" style="margin-top:12px;">
                     <input type="hidden" name="grupo" value="${g}">
-                    <select name="primeiro" style="width:100%; margin-bottom:6px; padding:6px; font-size:13px;"><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</select>
-                    <select name="segundo" style="width:100%; margin-bottom:10px; padding:6px; font-size:13px;"><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select>
-                    <button type="submit" class="btn" style="width:100%; padding:6px; font-size:12px;">Salvar Grupo</button>
+                    <select name="primeiro" style="width:100%; margin-bottom:6px; padding:6px; font-size:13px;" ${gruposBloqueados ? 'disabled' : ''}><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</select>
+                    <select name="segundo" style="width:100%; margin-bottom:10px; padding:6px; font-size:13px;" ${gruposBloqueados ? 'disabled' : ''}><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select>
+                    <button type="submit" class="btn" style="width:100%; padding:6px; font-size:12px;" ${gruposBloqueados ? 'disabled' : ''}>${gruposBloqueados ? 'Bloqueado' : 'Salvar Grupo'}</button>
                 </form>
                 ${real}
             </div>`;
@@ -476,9 +597,42 @@ app.get('/', (req, res) => {
     let htmlP = '';
     if (dispAtual.modo === 'rounds' || dispAtual.modo === 'ambos') {
         const jogosFase = PARTIDAS.filter(p => p.fase === faseAtiva);
+        
+        // --- CÁLCULO DE TENDÊNCIA DE PALPITES GLOBAL (SUGESTÃO 3) ---
+        let contagemPalpites = {};
+        competidores.forEach(comp => {
+            if (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][comp]) {
+                Object.keys(DB.pPlacar[dispAtual.id][comp]).forEach(pId => {
+                    const pal = DB.pPlacar[dispAtual.id][comp][pId];
+                    if (pal && pal.golA !== '' && pal.golB !== '') {
+                        if (!contagemPalpites[pId]) contagemPalpites[pId] = { timeA: 0, empate: 0, timeB: 0, total: 0 };
+                        const gA = parseInt(pal.golA);
+                        const gB = parseInt(pal.golB);
+                        if (gA > gB) contagemPalpites[pId].timeA++;
+                        else if (gA < gB) contagemPalpites[pId].timeB++;
+                        else contagemPalpites[pId].empate++;
+                        contagemPalpites[pId].total++;
+                    }
+                });
+            }
+        });
+
         jogosFase.forEach(p => {
             const pal = (DB.pPlacar[dispAtual.id] && DB.pPlacar[dispAtual.id][u] && DB.pPlacar[dispAtual.id][u][p.id]) || { golA: '', golB: '' };
             const real = DB.gabaritoPlacar[p.id] ? `<div style="background:#1e1b4b; padding:2px 6px; border-radius:4px; font-size:11px; color:#6366f1; text-align:center;">Oficial: ${DB.gabaritoPlacar[p.id].golA} x ${DB.gabaritoPlacar[p.id].golB}</div>` : '';
+            
+            // Verificação de travamento individual por tempo
+            const estaBloqueado = verificarPrazoBloqueio(p.dataHora);
+
+            // Geração de String de Tendência
+            let stringTendencia = `📊 Sem palpites gravados`;
+            if (contagemPalpites[p.id] && contagemPalpites[p.id].total > 0) {
+                const cP = contagemPalpites[p.id];
+                const pctA = Math.round((cP.timeA / cP.total) * 100);
+                const pctE = Math.round((cP.empate / cP.total) * 100);
+                const pctB = Math.round((cP.timeB / cP.total) * 100);
+                stringTendencia = `📊 Palpites: ${p.tA} ${pctA}% | Empate ${pctE}% | ${p.tB} ${pctB}%`;
+            }
 
             htmlP += `<div class="card-p">
                 <form action="/palpite/placar" method="POST" class="form-placar">
@@ -488,15 +642,16 @@ app.get('/', (req, res) => {
                     <div class="time-box casa"><span>${p.tA}</span> ${badge(p.tA)}</div>
                     
                     <div class="placar-inputs">
-                        <input type="number" name="golA" value="${pal.golA}">
+                        <input type="number" name="golA" value="${pal.golA}" ${estaBloqueado ? 'disabled' : ''}>
                         <span style="font-weight:bold; color:#f59e0b;">X</span>
-                        <input type="number" name="golB" value="${pal.golB}">
+                        <input type="number" name="golB" value="${pal.golB}" ${estaBloqueado ? 'disabled' : ''}>
                     </div>
                     
                     <div class="time-box fora">${badge(p.tB)} <span>${p.tB}</span></div>
                     
-                    <button type="submit" class="btn" style="padding:6px 12px; font-size:12px;">Salvar</button>
+                    <button type="submit" class="btn" style="padding:6px 12px; font-size:12px;" ${estaBloqueado ? 'disabled' : ''}>${estaBloqueado ? '🔒' : 'Salvar'}</button>
                 </form>
+                <div class="tendencia-bar">${stringTendencia}</div>
             </div>`;
         });
     }
@@ -507,7 +662,7 @@ app.get('/', (req, res) => {
         
         htmlAdmin = `
         <div class="admin-box">
-            <h2 style="margin-top:0; color:#6366f1; border-left:5px solid #6366f1; font-size:14px;">⚙️ PAINEL DO ADMINISTRADOR</h2>
+            <h2 style="margin-top:0; color:#6366f1; border-left:5px solid #6366f1; font-size:14px;">⚙️ PAINEL DO ADMINISTRADOR (LIVRE DE TRAVAS)</h2>
             <div style="display:flex; gap:15px; flex-direction:column;">
                 
                 <div style="background:#111827; padding:12px; border-radius:8px;">
@@ -544,13 +699,14 @@ app.get('/', (req, res) => {
         ${htmlCriadorGrupo}
         ${htmlLinkConvite}
         ${htmlRanking}
+        ${htmlSecador}
         ${htmlRegrasModo}
         ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
         ${htmlSeletorFases}
         ${htmlP ? `<h2>2. Placares da Rodada</h2><div>${htmlP}</div>` : ''}
         ${htmlAdmin}
     </div>
-    ${SCRIPT_DINAMICO}`); // Script injetado globalmente no fim do body
+    ${SCRIPT_DINAMICO}`);
 });
 
 app.listen(PORT, () => console.log(`Servidor ativo na porta ${PORT}`));
