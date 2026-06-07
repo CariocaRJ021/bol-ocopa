@@ -89,7 +89,7 @@ app.post('/palpite/placar', (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// 6. INTERFACE VISUAL ATUALIZADA
+// 6. INTERFACE VISUAL
 app.get('/', (req, res) => {
     const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px;}select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:300px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
 
@@ -110,7 +110,7 @@ app.get('/', (req, res) => {
         const linkCompleto = `https://meu-bolao-2026.onrender.com/?convite=${dispAtual.id}`;
         htmlLinkConvite = `
             <div style="background:#111827; border:1px solid #1f2937; padding:15px; margin-bottom:20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:14px; color:#9ca3af;">✉ shrink_to_fit Link de convite para este grupo:</span>
+                <span style="font-size:14px; color:#9ca3af;">✉️ Link de convite para este grupo:</span>
                 <input type="text" value="${linkCompleto}" readonly onclick="this.select(); document.execCommand('copy'); alert('Link copiado!');" style="width:340px; color:#f59e0b; text-align:center; font-weight:bold; cursor:pointer;">
             </div>`;
     }
@@ -126,7 +126,7 @@ app.get('/', (req, res) => {
     if (dispAtual.modo === 'grupos' || dispAtual.modo === 'ambos') {
         Object.keys(GRUPOS).forEach(g => {
             const pal = (pClassif[dispAtual.id] && pClassif[dispAtual.id][u] && pClassif[dispAtual.id][u][g]) || { primeiro: '', segundo: '' };
-            htmlG += `<div class="card-g"><h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3><form action="/palpite/grupo" method="POST"><input type="hidden" name="grupo" value="${g}"><select name="primeiro" style="width:100%; margin-bottom:5px;"><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</join('')}</select><select name="segundo" style="width:100%; margin-bottom:10px;"><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select><button type="submit" class="btn" style="width:100%; padding:4px; font-size:12px;">Salvar Grupo</button></form></div>`;
+            htmlG += `<div class="card-g"><h3 style="color:#10b981; margin:0 0 10px 0;">Grupo ${g}</h3><form action="/palpite/grupo" method="POST"><input type="hidden" name="grupo" value="${g}"><select name="primeiro" style="width:100%; margin-bottom:5px;"><option value="">1º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.primeiro===t?'selected':''}>${t}</option>`).join('')}</select><select name="segundo" style="width:100%; margin-bottom:10px;"><option value="">2º Lugar</option>${GRUPOS[g].map(t => `<option value="${t}" ${pal.segundo===t?'selected':''}>${t}</option>`).join('')}</select><button type="submit" class="btn" style="width:100%; padding:4px; font-size:12px;">Salvar Grupo</button></form></div>`;
         });
     }
 
@@ -151,4 +151,20 @@ app.get('/', (req, res) => {
             <h3 style="color:#f59e0b; margin:0 0 15px 0; font-size:14px; text-transform:uppercase;">➕ Criar Novo Grupo de Disputa</h3>
             <form action="/grupo/criar" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; margin:0;">
                 <input type="text" name="nome" placeholder="Nome do Grupo (Ex: Galera da Quadra)" required style="flex:1; min-width:200px;">
-                <select name="modo" style="color:#f59e0b; font-weight
+                <select name="modo" style="color:#f59e0b; font-weight:bold;">
+                    <option value="ambos">Modo: Ambos (Grupos e Placares)</option>
+                    <option value="grupos">Modo: Apenas Grupos</option>
+                    <option value="placares">Modo: Apenas Placares</option>
+                </select>
+                <button type="submit" class="btn">Criar Grupo Privado</button>
+            </form>
+        </div>
+
+        ${htmlLinkConvite}
+        ${htmlRanking}
+        ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
+        ${htmlP ? `<h2>2. Placares da Rodada</h2><div>${htmlP}</div>` : ''}
+    </div>`);
+});
+
+app.listen(PORT, () => console.log('Servidor ativo na nuvem!'));
