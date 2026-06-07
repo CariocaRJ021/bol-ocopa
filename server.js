@@ -8,34 +8,31 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({ secret: 'copa2026-key', resave: false, saveUninitialized: true }));
 
-// 1. BANCO DE DADOS EM MEMÓRIA (Agora aceita novos cadastros via formulário)
+// 1. BANCO DE DADOS EM MEMÓRIA (Com cadastro dinâmico liberado)
 const USUARIOS_CADASTRADOS = { "admin": "1234", "thiago": "1234", "sofia": "1234" };
 const disputasBase = [{ id: "GLOBAL", nome: "Bolão Geral (AMBOS)", modo: "ambos" }];
 const pClassif = {}; 
 const pPlacar = {};
 
-// 2. DICIONÁRIO DE BANDEIRAS OFICIAIS
+// 2. DICIONÁRIO DE BANDEIRAS REAL (Baseado nas imagens do seu sistema)
 const PAISES = { 
-    "Estados Unidos": "us", "Jamaica": "jm", "Ucrânia": "ua", "África do Sul": "za",
-    "México": "mx", "Costa Rica": "cr", "Polônia": "pl", "Tunísia": "tn",
-    "Canadá": "ca", "Panamá": "pa", "Chéquia": "cz", "Argélia": "dz"
+    "México": "mx", "África do Sul": "za", "Coreia do Sul": "kr", "Chéquia": "cz",
+    "Canadá": "ca", "Bósnia e Herzegovina": "ba", "Catar": "qa", "Suíça": "ch",
+    "Brasil": "br", "Marrocos": "ma", "Haiti": "ht", "Escócia": "gb-sct"
 };
 
-// 3. ESTRUTURA REAL DOS GRUPOS A, B e C
+// 3. ESTRUTURA DOS GRUPOS A, B e C CONFORME SEUS PRINTS
 const GRUPOS = { 
-    A: ["Estados Unidos", "Jamaica", "Ucrânia", "África do Sul"], 
-    B: ["México", "Costa Rica", "Polônia", "Tunísia"], 
-    C: ["Canadá", "Panamá", "Chéquia", "Argélia"] 
+    A: ["México", "África do Sul", "Coreia do Sul", "Chéquia"], 
+    B: ["Canadá", "Bósnia e Herzegovina", "Catar", "Suíça"], 
+    C: ["Brasil", "Marrocos", "Haiti", "Escócia"] 
 };
 
-// 4. JOGOS REAIS DA 1ª RODADA ORGANIZADOS POR GRUPO
+// 4. JOGOS DA 1ª RODADA MAPEADOS CORRETAMENTE
 const PARTIDAS = [
-    { id: 1, tA: "Estados Unidos", tB: "Jamaica", grupo: "A" },
-    { id: 2, tA: "Ucrânia", tB: "África do Sul", grupo: "A" },
-    { id: 3, tA: "México", tB: "Costa Rica", grupo: "B" },
-    { id: 4, tA: "Polônia", tB: "Tunísia", grupo: "B" },
-    { id: 5, tA: "Canadá", tB: "Panamá", grupo: "C" },
-    { id: 6, tA: "Chéquia", tB: "Argélia", grupo: "C" }
+    { id: 1, tA: "México", tB: "África do Sul", grupo: "A" },
+    { id: 2, tA: "Canadá", tB: "Bósnia e Herzegovina", grupo: "B" },
+    { id: 3, tA: "Brasil", tB: "Marrocos", grupo: "C" }
 ];
 
 function badge(time) {
@@ -43,7 +40,7 @@ function badge(time) {
     return c ? `<img src="https://flagcdn.com/w40/${c}.png" style="width:26px; border-radius:4px; vertical-align:middle; margin:0 6px;">` : '';
 }
 
-// 5. ROTAS DE AUTENTICAÇÃO (LOGIN E CADASTRO)
+// 5. ROTAS DE AUTENTICAÇÃO (LOGIN E CADASTRO DINÂMICO)
 app.post('/login', (req, res) => {
     const user = req.body.username.trim().toLowerCase();
     if (USUARIOS_CADASTRADOS[user] && USUARIOS_CADASTRADOS[user] === req.body.password) {
@@ -59,22 +56,19 @@ app.post('/cadastrar', (req, res) => {
     const pass = req.body.password;
 
     if (!user || !pass) {
-        return res.send("<h3>Erro! Usuário e senha são obrigatórios. <a href='/?tela=cadastro'>Voltar</a></h3>");
+        return res.send("<h3>Erro! Preencha todos os campos. <a href='/?tela=cadastro'>Voltar</a></h3>");
     }
     if (USUARIOS_CADASTRADOS[user]) {
-        return res.send("<h3>Erro! Este usuário já existe. Escolha outro nome. <a href='/?tela=cadastro'>Voltar</a></h3>");
+        return res.send("<h3>Erro! Usuário já cadastrado. <a href='/?tela=cadastro'>Voltar</a></h3>");
     }
 
-    // Salva o novo amigo na memória do servidor
-    USUARIOS_CADASTRADOS[user] = pass;
-    
-    // Faz o login automático do novo usuário
-    req.session.user = user;
+    USUARIOS_CADASTRADOS[user] = pass; // Salva o novo usuário na memória
+    req.session.user = user;           // Loga automaticamente
     req.session.dispId = req.session.convitePendente || "GLOBAL";
     res.redirect('/');
 });
 
-// ROTAS DE GERENCIAMENTO DE DISPUTAS E PALPITES
+// ROTAS DE INTERAÇÃO DO BOLÃO
 app.post('/grupo/criar', (req, res) => {
     const codigoUnico = 'COPA-' + Math.random().toString(36).substr(2, 4).toUpperCase();
     disputasBase.push({ id: codigoUnico, nome: req.body.nome, modo: req.body.modo });
@@ -105,20 +99,18 @@ app.post('/palpite/placar', (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// 6. INTERFACE VISUAL COM CHAVEAMENTO DE TELA
+// 6. INTERFACE INTERATIVA
 app.get('/', (req, res) => {
-    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px; transition: 0.2s;} .btn:hover{opacity:0.9;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:300px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
+    const css = `<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet"><style>body{background:#0b0f19;color:#f3f4f6;font-family:'Poppins',sans-serif;margin:0;padding:20px;}.container{max-width:1100px;margin:auto;}h2{color:#f59e0b;border-left:5px solid #10b981;padding-left:12px;font-size:18px;text-transform:uppercase;margin-top:40px;}.btn{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 15px;font-weight:600;cursor:pointer;border-radius:6px; transition: 0.2s;} select,input{background:#1f2937;color:#fff;border:1px solid #374151;padding:8px;border-radius:6px;}.grid{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;}.card-g{background:#111827;border:1px solid #1f2937;padding:15px;border-radius:12px;width:300px;border-top:4px solid #10b981;}.card-p{background:#111827;border:1px solid #1f2937;padding:12px 15px;margin:8px 0;border-radius:12px;border-left:5px solid #f59e0b;display:flex;justify-content:space-between;align-items:center;}.row{display:flex;align-items:center;gap:10px;width:38%;}table{width:100%;border-collapse:collapse;background:#111827;border-radius:8px;overflow:hidden;}th,td{padding:12px;text-align:left;border-bottom:1px solid #1f2937;}th{background:#10b981;color:#fff;}</style>`;
 
     if (req.query.convite) {
         req.session.convitePendente = req.query.convite.trim().toUpperCase();
     }
 
-    // Tela de login e cadastro dinâmico para quem não está logado
+    // Gerencia o fluxo de Login / Registro na página principal
     if (!req.session.user) {
-        const querCadastro = req.query.tela === 'cadastro';
-        
-        if (querCadastro) {
-            return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #10b981;"><h2>📝 CRIAR CONTA NO BOLÃO</h2><form action="/cadastrar" method="POST"><input type="text" name="username" placeholder="Escolha um Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Defina uma Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Finalizar Cadastro e Entrar</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/" style="color:#f59e0b; text-decoration:none;">Já tem conta? Faça Login</a></p></div></div>`);
+        if (req.query.tela === 'cadastro') {
+            return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #10b981;"><h2>📝 NOVO CADASTRO</h2><form action="/cadastrar" method="POST"><input type="text" name="username" placeholder="Escolha um Nome de Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Crie uma Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Registrar e Entrar</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/" style="color:#f59e0b; text-decoration:none;">Já possui conta? Conecte-se</a></p></div></div>`);
         } else {
             return res.send(`${css}<div style="display:flex; justify-content:center; align-items:center; min-height:90vh;"><div style="background:#111827; padding:40px; border-radius:16px; border:1px solid #1f2937; width:100%; max-width:400px; border-top:6px solid #f59e0b;"><h2>🏆 ENTRAR NO BOLÃO</h2><form action="/login" method="POST"><input type="text" name="username" placeholder="Usuário" required style="width:100%; margin-bottom:15px;"><br><input type="password" name="password" placeholder="Senha" required style="width:100%; margin-bottom:20px;"><br><button type="submit" class="btn" style="width:100%;">Acessar Sistema</button></form><p style="margin-top:20px; font-size:13px; text-align:center;"><a href="/?tela=cadastro" style="color:#10b981; text-decoration:none; font-weight:bold;">Não tem uma conta? Cadastre-se aqui</a></p></div></div>`);
         }
@@ -139,7 +131,6 @@ app.get('/', (req, res) => {
     }
 
     let htmlRanking = `<h2>🏆 Classificação Geral (${dispAtual.nome})</h2><table><tr><th>Posição</th><th>Jogador</th><th>Pontos Ganhos</th></tr>`;
-    // Lista dinamicamente o usuário logado se ele for novo
     const listaJogadores = ["thiago", "sofia", "admin"];
     if (!listaJogadores.includes(u)) { listaJogadores.push(u); }
 
@@ -191,7 +182,3 @@ app.get('/', (req, res) => {
         ${htmlRanking}
         ${htmlG ? `<h2>1. Classificados da Fase de Grupos</h2><div class="grid">${htmlG}</div>` : ''}
         ${htmlP ? `<h2>2. Placares da Rodada</h2><div>${htmlP}</div>` : ''}
-    </div>`);
-});
-
-app.listen(PORT, () => console.log('Servidor ativo na nuvem!'));
